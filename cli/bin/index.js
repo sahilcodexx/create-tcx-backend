@@ -181,6 +181,13 @@ function createFallbackTemplate(targetDir, projectName, framework, database, lan
 
   let indexCode = '';
 
+  const writeProjectFile = (relativePath, content) => {
+    const filePath = path.join(targetDir, relativePath);
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filePath, content.trim() + '\n');
+  };
+
   if (framework === 'express') {
     pkgJson.dependencies['express'] = '^4.18.2';
     pkgJson.dependencies['dotenv'] = '^16.3.1';
@@ -189,10 +196,561 @@ function createFallbackTemplate(targetDir, projectName, framework, database, lan
       pkgJson.devDependencies['@types/express'] = '^4.17.21';
       pkgJson.devDependencies['@types/cors'] = '^2.8.17';
     }
+    if (hasAuth) {
+      pkgJson.dependencies['jsonwebtoken'] = '^9.0.2';
+      pkgJson.dependencies['bcryptjs'] = '^2.4.3';
+      if (isTs) {
+        pkgJson.devDependencies['@types/jsonwebtoken'] = '^9.0.6';
+        pkgJson.devDependencies['@types/bcryptjs'] = '^2.4.6';
+      }
+    }
+    if (database === 'prisma') {
+      pkgJson.dependencies['@prisma/client'] = '^5.0.0';
+      pkgJson.devDependencies['prisma'] = '^5.0.0';
+    } else if (database === 'mongoose') {
+      pkgJson.dependencies['mongoose'] = '^7.0.0';
+    }
 
-    indexCode = `import express from 'express';
+    // Write database connection
+    let dbContent = '';
+    if (database === 'mongoose') {
+      dbContent = isTs ? `import mongoose from 'mongoose';
+
+export const connectDB = async (): Promise<void> => {
+  try {
+    const conn = await mongoose.connect(process.env.DATABASE_URL || 'mongodb://localhost:27017/${projectName}');
+    console.log(\`MongoDB Connected: \${conn.connection.host}\`);
+  } catch (error: any) {
+    console.error(\`Error connecting to MongoDB: \${error.message}\`);
+    process.exit(1);
+  }
+};` : `import mongoose from 'mongoose';
+
+export const connectDB = async () => {
+  try {
+    const conn = await mongoose.connect(process.env.DATABASE_URL || 'mongodb://localhost:27017/${projectName}');
+    console.log(\`MongoDB Connected: \${conn.connection.host}\`);
+  } catch (error) {
+    console.error(\`Error connecting to MongoDB: \${error.message}\`);
+    process.exit(1);
+  }
+};`;
+    } else if (database === 'prisma') {
+      dbContent = isTs ? `import { PrismaClient } from '@prisma/client';
+
+export const prisma = new PrismaClient();
+
+export const connectDB = async (): Promise<void> => {
+  try {
+    await prisma.$connect();
+    console.log('Database connected successfully via Prisma Client.');
+  } catch (error) {
+    console.error('Error connecting to database via Prisma Client:', error);
+    process.exit(1);
+  }
+};` : `import { PrismaClient } from '@prisma/client';
+
+export const prisma = new PrismaClient();
+
+export const connectDB = async () => {
+  try {
+    await prisma.$connect();
+    console.log('Database connected successfully via Prisma Client.');
+  } catch (error) {
+    console.error('Error connecting to database via Prisma Client:', error);
+    process.exit(1);
+  }
+};`;
+    } else {
+      dbContent = isTs ? `export const connectDB = async (): Promise<void> => {
+  console.log('No database selected. Running server without database connection.');
+};` : `export const connectDB = async () => {
+  console.log('No database selected. Running server without database connection.');
+};`;
+    }
+    writeProjectFile(`src/config/db.${ext}`, dbContent);
+
+    // Prisma Schema
+    if (database === 'prisma') {
+      const prismaSchema = `datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}`;
+      writeProjectFile('prisma/schema.prisma', prismaSchema);
+    }
+
+    // Auth middleware, controller, route, model
+    if (hasAuth) {
+      if (database === 'mongoose') {
+        const userModel = `import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
+
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true }
+}, {
+  timestamps: true
+});
+
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) {
+    next();
+  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+});
+
+userSchema.methods.matchPassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+const User = mongoose.model('User', userSchema);
+export default User;`;
+        writeProjectFile(`src/models/user.model.${ext}`, userModel);
+      }
+
+      const middlewareContent = isTs ? `import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+
+export interface AuthRequest extends Request {
+  user?: any;
+}
+
+export const protect = async (req: AuthRequest, res: Response, next: NextFunction): Promise<any> => {
+  let token;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    try {
+      token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+      req.user = decoded;
+      return next();
+    } catch (error) {
+      return res.status(401).json({ message: 'Not authorized, token failed' });
+    }
+  }
+  if (!token) {
+    return res.status(401).json({ message: 'Not authorized, no token' });
+  }
+};` : `import jwt from 'jsonwebtoken';
+
+export const protect = async (req, res, next) => {
+  let token;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    try {
+      token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+      req.user = decoded;
+      return next();
+    } catch (error) {
+      return res.status(401).json({ message: 'Not authorized, token failed' });
+    }
+  }
+  if (!token) {
+    return res.status(401).json({ message: 'Not authorized, no token' });
+  }
+};`;
+      writeProjectFile(`src/middleware/auth.middleware.${ext}`, middlewareContent);
+
+      let controllerContent = '';
+      if (database === 'mongoose') {
+        controllerContent = isTs ? `import { Request, Response } from 'express';
+import User from '../models/user.model.js';
+import jwt from 'jsonwebtoken';
+import { AuthRequest } from '../middleware/auth.middleware.js';
+
+const generateToken = (id: any): string => {
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '30d' });
+};
+
+export const registerUser = async (req: Request, res: Response): Promise<any> => {
+  const { name, email, password } = req.body;
+  try {
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+    const user = await User.create({ name, email, password });
+    return res.status(201).json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      token: generateToken(user._id)
+    });
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const loginUser = async (req: Request, res: Response): Promise<any> => {
+  const { email, password } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (user && (await (user as any).matchPassword(password))) {
+      return res.json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        token: generateToken(user._id)
+      });
+    } else {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const getMe = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    return res.json(user);
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+};` : `import User from '../models/user.model.js';
+import jwt from 'jsonwebtoken';
+
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '30d' });
+};
+
+export const registerUser = async (req, res) => {
+  const { name, email, password } = req.body;
+  try {
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+    const user = await User.create({ name, email, password });
+    return res.status(201).json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      token: generateToken(user._id)
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const loginUser = async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (user && (await user.matchPassword(password))) {
+      return res.json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        token: generateToken(user._id)
+      });
+    } else {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    return res.json(user);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};`;
+      } else if (database === 'prisma') {
+        controllerContent = isTs ? `import { Request, Response } from 'express';
+import { prisma } from '../config/db.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { AuthRequest } from '../middleware/auth.middleware.js';
+
+const generateToken = (id: any): string => {
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '30d' });
+};
+
+export const registerUser = async (req: Request, res: Response): Promise<any> => {
+  const { name, email, password } = req.body;
+  try {
+    const userExists = await prisma.user.findUnique({ where: { email } });
+    if (userExists) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: { name, email, password: hashedPassword }
+    });
+    return res.status(201).json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      token: generateToken(user.id)
+    });
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const loginUser = async (req: Request, res: Response): Promise<any> => {
+  const { email, password } = req.body;
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user && (await bcrypt.compare(password, user.password))) {
+      return res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        token: generateToken(user.id)
+      });
+    } else {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const getMe = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    });
+    if (user) {
+      const { password, ...userWithoutPassword } = user;
+      return res.json(userWithoutPassword);
+    } else {
+      return res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+};` : `import { prisma } from '../config/db.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '30d' });
+};
+
+export const registerUser = async (req, res) => {
+  const { name, email, password } = req.body;
+  try {
+    const userExists = await prisma.user.findUnique({ where: { email } });
+    if (userExists) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: { name, email, password: hashedPassword }
+    });
+    return res.status(201).json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      token: generateToken(user.id)
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const loginUser = async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user && (await bcrypt.compare(password, user.password))) {
+      return res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        token: generateToken(user.id)
+      });
+    } else {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const getMe = async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    });
+    if (user) {
+      const { password, ...userWithoutPassword } = user;
+      return res.json(userWithoutPassword);
+    } else {
+      return res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};`;
+      } else {
+        controllerContent = isTs ? `import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { AuthRequest } from '../middleware/auth.middleware.js';
+
+interface UserMock {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+}
+
+const users: UserMock[] = [];
+
+const generateToken = (id: string): string => {
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '30d' });
+};
+
+export const registerUser = async (req: Request, res: Response): Promise<any> => {
+  const { name, email, password } = req.body;
+  try {
+    const userExists = users.find(u => u.email === email);
+    if (userExists) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user: UserMock = { id: String(users.length + 1), name, email, password: hashedPassword };
+    users.push(user);
+    return res.status(201).json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      token: generateToken(user.id)
+    });
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const loginUser = async (req: Request, res: Response): Promise<any> => {
+  const { email, password } = req.body;
+  try {
+    const user = users.find(u => u.email === email);
+    if (user && user.password && (await bcrypt.compare(password, user.password))) {
+      return res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        token: generateToken(user.id)
+      });
+    } else {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const getMe = async (req: AuthRequest, res: Response): Promise<any> => {
+  const user = users.find(u => u.id === req.user.id);
+  if (user) {
+    const { password, ...userWithoutPassword } = user;
+    return res.json(userWithoutPassword);
+  } else {
+    return res.status(404).json({ message: 'User not found' });
+  }
+};` : `import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+const users = [];
+
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '30d' });
+};
+
+export const registerUser = async (req, res) => {
+  const { name, email, password } = req.body;
+  try {
+    const userExists = users.find(u => u.email === email);
+    if (userExists) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = { id: String(users.length + 1), name, email, password: hashedPassword };
+    users.push(user);
+    return res.status(201).json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      token: generateToken(user.id)
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const loginUser = async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = users.find(u => u.email === email);
+    if (user && (await bcrypt.compare(password, user.password))) {
+      return res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        token: generateToken(user.id)
+      });
+    } else {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const getMe = async (req, res) => {
+  const user = users.find(u => u.id === req.user.id);
+  if (user) {
+    const { password, ...userWithoutPassword } = user;
+    return res.json(userWithoutPassword);
+  } else {
+    return res.status(404).json({ message: 'User not found' });
+  }
+};`;
+      }
+      writeProjectFile(`src/controllers/auth.controller.${ext}`, controllerContent);
+
+      const routesContent = `import express from 'express';
+import { registerUser, loginUser, getMe } from '../controllers/auth.controller.js';
+import { protect } from '../middleware/auth.middleware.js';
+
+const router = express.Router();
+
+router.post('/register', registerUser);
+router.post('/login', loginUser);
+router.get('/me', protect, getMe);
+
+export default router;`;
+      writeProjectFile(`src/routes/auth.routes.${ext}`, routesContent);
+    }
+
+    indexCode = isTs ? `import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { connectDB } from './config/db.js';
+${hasAuth ? "import authRoutes from './routes/auth.routes.js';" : ""}
 
 dotenv.config();
 
@@ -202,33 +760,43 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// Connect to database
+connectDB();
+
+app.get('/api/health', (req: Request, res: Response) => {
+  res.json({ status: 'ok', framework: 'Express', database: '${database}' });
+});
+
+${hasAuth ? "app.use('/api/auth', authRoutes);" : ""}
+
+app.listen(PORT, () => {
+  console.log(\`🚀 Server running on http://localhost:\${PORT}\`);
+});` : `import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { connectDB } from './config/db.js';
+${hasAuth ? "import authRoutes from './routes/auth.routes.js';" : ""}
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(cors());
+app.use(express.json());
+
+// Connect to database
+connectDB();
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', framework: 'Express', database: '${database}' });
 });
-`;
 
-    if (database === 'prisma') {
-      pkgJson.dependencies['@prisma/client'] = '^5.0.0';
-      pkgJson.devDependencies['prisma'] = '^5.0.0';
-      indexCode += `
-// Prisma Client instantiation placeholder
-// import { PrismaClient } from '@prisma/client';
-// const prisma = new PrismaClient();
-`;
-    } else if (database === 'mongoose') {
-      pkgJson.dependencies['mongoose'] = '^7.0.0';
-      indexCode += `
-// Mongoose Connection placeholder
-// import mongoose from 'mongoose';
-// mongoose.connect(process.env.DATABASE_URL || 'mongodb://localhost:27017/${projectName}');
-`;
-    }
+${hasAuth ? "app.use('/api/auth', authRoutes);" : ""}
 
-    indexCode += `
 app.listen(PORT, () => {
   console.log(\`🚀 Server running on http://localhost:\${PORT}\`);
-});
-`;
+});`;
   } else {
     // Fastify
     pkgJson.dependencies['fastify'] = '^4.21.0';
