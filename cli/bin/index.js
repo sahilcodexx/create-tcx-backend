@@ -60,7 +60,15 @@ async function main() {
       process.exit(1);
     }
 
-    // 2. Select Template (Express vs Fastify)
+    // 2. Select Language (TypeScript vs JavaScript)
+    console.log(`\n${bold}Select a language:${reset}`);
+    console.log(`  ${cyan}1)${reset} TypeScript ${dim}(Recommended - type-safe and modern)${reset}`);
+    console.log(`  ${cyan}2)${reset} JavaScript ${dim}(Standard Node.js ESM)${reset}`);
+    let langChoice = await rl.question(`${bold}👉 Choose [1-2] (default: 1):${reset} `);
+    langChoice = langChoice.trim() || '1';
+    const language = langChoice === '2' ? 'js' : 'ts';
+
+    // 3. Select Template (Express vs Fastify)
     console.log(`\n${bold}Select a framework template:${reset}`);
     console.log(`  ${cyan}1)${reset} Express.js ${dim}(Classic & highly compatible)${reset}`);
     console.log(`  ${cyan}2)${reset} Fastify    ${dim}(High performance & modern)${reset}`);
@@ -68,7 +76,7 @@ async function main() {
     frameworkChoice = frameworkChoice.trim() || '1';
     const framework = frameworkChoice === '2' ? 'fastify' : 'express';
 
-    // 3. Select Database (Prisma vs Mongoose vs None)
+    // 4. Select Database (Prisma vs Mongoose vs None)
     console.log(`\n${bold}Select a database client:${reset}`);
     console.log(`  ${cyan}1)${reset} Prisma   ${dim}(SQL - PostgreSQL, MySQL, SQLite, etc.)${reset}`);
     console.log(`  ${cyan}2)${reset} Mongoose ${dim}(NoSQL - MongoDB)${reset}`);
@@ -82,27 +90,25 @@ async function main() {
 
     rl.close();
 
-    // Determine the template key
-    const templateKey = `${framework}-${database}`;
-    const templatesDir = path.resolve(__dirname, '../templates');
-    const sourceDir = path.join(templatesDir, templateKey);
-
     console.log(`\n${cyan}⚙ Scaffold settings:${reset}`);
     console.log(`  • Directory: ${green}${isCurrentDir ? `${displayProjectName} (current directory)` : projectName}${reset}`);
+    console.log(`  • Language:  ${green}${language === 'ts' ? 'TypeScript' : 'JavaScript'}${reset}`);
     console.log(`  • Framework: ${green}${framework}${reset}`);
     console.log(`  • Database:  ${green}${database}${reset}`);
+
+    const templatesDir = path.resolve(__dirname, '../templates');
+    const sourceDir = path.join(templatesDir, `${framework}-${database}-${language}`);
 
     console.log(`\n${dim}Creating project files...${reset}`);
 
     // Create target directory
     fs.mkdirSync(targetDir, { recursive: true });
 
-    // Copy template directory
+    // Copy template directory if exists, otherwise generate dynamically
     if (fs.existsSync(sourceDir)) {
       fs.cpSync(sourceDir, targetDir, { recursive: true });
     } else {
-      // Fallback if template doesn't exist yet, we'll create a basic fallback structure
-      createFallbackTemplate(targetDir, projectName, framework, database);
+      createFallbackTemplate(targetDir, displayProjectName, framework, database, language);
     }
 
     // Update package.json in targetDir with the new project name
@@ -132,7 +138,10 @@ async function main() {
   }
 }
 
-function createFallbackTemplate(targetDir, projectName, framework, database) {
+function createFallbackTemplate(targetDir, projectName, framework, database, language) {
+  const isTs = language === 'ts';
+  const ext = isTs ? 'ts' : 'js';
+  
   // Setup fallback file structure
   const srcDir = path.join(targetDir, 'src');
   fs.mkdirSync(srcDir, { recursive: true });
@@ -142,13 +151,21 @@ function createFallbackTemplate(targetDir, projectName, framework, database) {
     version: "1.0.0",
     private: true,
     type: "module",
-    scripts: {
+    scripts: isTs ? {
+      "build": "tsc",
+      "start": "node dist/index.js",
+      "dev": "tsx watch src/index.ts"
+    } : {
       "start": "node src/index.js",
       "dev": "nodemon src/index.js"
     },
     dependencies: {},
-    devDependencies: {
-      "nodemon": "^3.0.0"
+    devDependencies: isTs ? {
+      "tsx": "^4.7.1",
+      "typescript": "^5.3.3",
+      "@types/node": "^20.11.24"
+    } : {
+      "nodemon": "^3.1.0"
     }
   };
 
@@ -158,6 +175,10 @@ function createFallbackTemplate(targetDir, projectName, framework, database) {
     pkgJson.dependencies['express'] = '^4.18.2';
     pkgJson.dependencies['dotenv'] = '^16.3.1';
     pkgJson.dependencies['cors'] = '^2.8.5';
+    if (isTs) {
+      pkgJson.devDependencies['@types/express'] = '^4.17.21';
+      pkgJson.devDependencies['@types/cors'] = '^2.8.17';
+    }
 
     indexCode = `import express from 'express';
 import cors from 'cors';
@@ -242,10 +263,27 @@ start();
 
   // Write files
   fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify(pkgJson, null, 2));
-  fs.writeFileSync(path.join(srcDir, 'index.js'), indexCode);
-  fs.writeFileSync(path.join(targetDir, '.gitignore'), `node_modules/\n.env\n`);
+  fs.writeFileSync(path.join(srcDir, `index.${ext}`), indexCode);
+  fs.writeFileSync(path.join(targetDir, '.gitignore'), `node_modules/\n.env\ndist/\n`);
   fs.writeFileSync(path.join(targetDir, '.env'), `PORT=5000\nDATABASE_URL="file:./dev.db"\n`);
   fs.writeFileSync(path.join(targetDir, 'README.md'), `# ${projectName}\n\nGenerated with create-tcx-backend.\n`);
+
+  if (isTs) {
+    const tsconfig = {
+      compilerOptions: {
+        target: "ES2022",
+        module: "NodeNext",
+        moduleResolution: "NodeNext",
+        esModuleInterop: true,
+        strict: true,
+        skipLibCheck: true,
+        outDir: "./dist",
+        rootDir: "./src"
+      },
+      include: ["src/**/*"]
+    };
+    fs.writeFileSync(path.join(targetDir, 'tsconfig.json'), JSON.stringify(tsconfig, null, 2));
+  }
 }
 
 main();
