@@ -1401,8 +1401,99 @@ start();`;
   fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify(pkgJson, null, 2));
   fs.writeFileSync(path.join(srcDir, `index.${ext}`), indexCode);
   fs.writeFileSync(path.join(targetDir, '.gitignore'), `node_modules/\n.env\ndist/\n`);
-  fs.writeFileSync(path.join(targetDir, '.env'), `PORT=5000\nDATABASE_URL="file:./dev.db"\n`);
-  fs.writeFileSync(path.join(targetDir, 'README.md'), `# ${projectName}\n\nGenerated with create-tcx-backend.\n`);
+  
+  // Write .env and .env.example
+  const envContent = `PORT=5000\nDATABASE_URL="file:./dev.db"\nJWT_SECRET="supersecretkey12345"\n`;
+  fs.writeFileSync(path.join(targetDir, '.env'), envContent);
+  fs.writeFileSync(path.join(targetDir, '.env.example'), `PORT=5000\nDATABASE_URL="your-database-connection-url"\nJWT_SECRET="your-jwt-secret-key"\n`);
+
+  // Write README.md with customized details
+  const readmeContent = `# ${projectName}
+
+Generated with \`create-tcx-backend\` CLI.
+
+## Tech Stack
+- **Framework**: ${framework === 'express' ? 'Express.js' : 'Fastify'}
+- **Language**: ${language === 'ts' ? 'TypeScript' : 'JavaScript'}
+- **Database**: ${database === 'none' ? 'None (In-Memory Mock)' : database}
+- **Authentication**: ${auth === 'jwt' ? 'JWT (jsonwebtoken/bcryptjs)' : 'None'}
+
+## Setup
+
+1. Install dependencies:
+   \`\`\`bash
+   npm install
+   \`\`\`
+
+2. Configure environment variables in \`.env\`.
+
+3. Run in development mode:
+   \`\`\`bash
+   npm run dev
+   \`\`\`
+
+4. Build and run in production:
+   \`\`\`bash
+   npm run build
+   npm start
+   \`\`\`
+`;
+  fs.writeFileSync(path.join(targetDir, 'README.md'), readmeContent);
+
+  // Write Dockerfile
+  const dockerfileContent = `FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+${isTs ? 'COPY tsconfig.json ./' : ''}
+
+RUN npm install
+
+COPY . .
+
+${isTs ? 'RUN npm run build' : ''}
+
+EXPOSE 5000
+
+CMD ["npm", "start"]
+`;
+  fs.writeFileSync(path.join(targetDir, 'Dockerfile'), dockerfileContent);
+
+  // Write api.http for API testing
+  const apiHttpContent = `### Health Check
+GET http://localhost:5000/api/health
+Accept: application/json
+
+${hasAuth ? `### Register User
+POST http://localhost:5000/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "securepassword123"
+}
+
+### Login User
+# @name login
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "password": "securepassword123"
+}
+
+### Get Logged In User profile
+# Uses token from login request (replace token if not using VS Code REST Client extension)
+@authToken = {{login.response.body.token}}
+
+GET http://localhost:5000/api/auth/me
+Authorization: Bearer {{authToken}}
+Accept: application/json` : ''}
+`;
+  fs.writeFileSync(path.join(targetDir, 'api.http'), apiHttpContent.trim() + '\n');
 
   if (isTs) {
     const tsconfig = {
