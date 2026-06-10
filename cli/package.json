@@ -1,0 +1,29 @@
+{
+  "name": "create-tcx-backend",
+  "version": "1.0.0",
+  "description": "CLI tool to quickly scaffold a TCX Backend application",
+  "type": "module",
+  "bin": {
+    "create-tcx-backend": "./bin/index.js"
+  },
+  "files": [
+    "bin",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "scripts": {
+    "start": "node bin/index.js"
+  },
+  "keywords": [
+    "create",
+    "tcx",
+    "backend",
+    "scaffold",
+    "cli",
+    "boilerplate"
+  ],
+  "author": "sahilcodexx",
+  "license": "MIT"
+}

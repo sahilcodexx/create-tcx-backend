@@ -1,0 +1,17 @@
+{
+  "name": "tcxbackend-monorepo",
+  "version": "1.0.0",
+  "description": "Monorepo for create-tcx-backend CLI and web templates",
+  "private": true,
+  "workspaces": [
+    "cli",
+    "web"
+  ],
+  "scripts": {
+    "cli:dev": "node cli/bin/index.js",
+    "web:dev": "npm run dev --workspace=web"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

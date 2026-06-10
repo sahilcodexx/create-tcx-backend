@@ -1,0 +1,10 @@
+{
+  "name": "tcx-backend-web",
+  "version": "1.0.0",
+  "description": "Companion web interface or template for TCX Backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo \"Web companion dev server running... (placeholder)\""
+  }
+}
