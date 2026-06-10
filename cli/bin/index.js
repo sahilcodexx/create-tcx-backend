@@ -37,9 +37,24 @@ async function main() {
     let projectName = await rl.question(`${bold}✔ Project name:${reset} ${dim}(my-tcx-backend)${reset} `);
     projectName = projectName.trim() || 'my-tcx-backend';
 
+    const isCurrentDir = projectName === '.';
     const targetDir = path.resolve(process.cwd(), projectName);
+    const displayProjectName = isCurrentDir ? path.basename(targetDir) : projectName;
 
-    if (fs.existsSync(targetDir)) {
+    if (isCurrentDir) {
+      if (fs.existsSync(targetDir)) {
+        const files = fs.readdirSync(targetDir);
+        if (files.length > 0 && !files.every(f => f === '.git' || f === '.gitignore')) {
+          console.log(`\n${yellow}⚠ Warning: Current directory is not empty.${reset}`);
+          const proceed = await rl.question(`${bold}👉 Do you want to scaffold here anyway? (y/n, default: y):${reset} `);
+          if (proceed.toLowerCase().trim() === 'n') {
+            console.log(`\n${red}✖ Scaffolding cancelled.${reset}`);
+            rl.close();
+            process.exit(0);
+          }
+        }
+      }
+    } else if (fs.existsSync(targetDir)) {
       console.log(`\n${red}✖ Error: Directory '${projectName}' already exists.${reset}`);
       rl.close();
       process.exit(1);
@@ -73,7 +88,7 @@ async function main() {
     const sourceDir = path.join(templatesDir, templateKey);
 
     console.log(`\n${cyan}⚙ Scaffold settings:${reset}`);
-    console.log(`  • Directory: ${green}${projectName}${reset}`);
+    console.log(`  • Directory: ${green}${isCurrentDir ? `${displayProjectName} (current directory)` : projectName}${reset}`);
     console.log(`  • Framework: ${green}${framework}${reset}`);
     console.log(`  • Database:  ${green}${database}${reset}`);
 
@@ -94,7 +109,7 @@ async function main() {
     const pkgJsonPath = path.join(targetDir, 'package.json');
     if (fs.existsSync(pkgJsonPath)) {
       const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
-      pkg.name = projectName;
+      pkg.name = displayProjectName;
       fs.writeFileSync(pkgJsonPath, JSON.stringify(pkg, null, 2));
     }
 
@@ -102,7 +117,9 @@ async function main() {
 
     // Optional: Setup git & run npm install automatically
     console.log(`\n${bold}Next steps:${reset}`);
-    console.log(`  ${cyan}cd${reset} ${projectName}`);
+    if (!isCurrentDir) {
+      console.log(`  ${cyan}cd${reset} ${projectName}`);
+    }
     console.log(`  ${cyan}npm install${reset}`);
     console.log(`  ${cyan}npm run dev${reset}\n`);
 
