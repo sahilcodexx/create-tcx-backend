@@ -802,10 +802,533 @@ app.listen(PORT, () => {
     pkgJson.dependencies['fastify'] = '^4.21.0';
     pkgJson.dependencies['@fastify/cors'] = '^8.3.0';
     pkgJson.dependencies['dotenv'] = '^16.3.1';
+    if (hasAuth) {
+      pkgJson.dependencies['@fastify/jwt'] = '^8.0.0';
+      pkgJson.dependencies['bcryptjs'] = '^2.4.3';
+      pkgJson.dependencies['fastify-plugin'] = '^4.5.1';
+      if (isTs) {
+        pkgJson.devDependencies['@types/bcryptjs'] = '^2.4.6';
+      }
+    }
+    if (database === 'prisma') {
+      pkgJson.dependencies['@prisma/client'] = '^5.0.0';
+      pkgJson.devDependencies['prisma'] = '^5.0.0';
+    } else if (database === 'mongoose') {
+      pkgJson.dependencies['mongoose'] = '^7.0.0';
+    }
 
-    indexCode = `import Fastify from 'fastify';
+    // Write database connection
+    let dbContent = '';
+    if (database === 'mongoose') {
+      dbContent = isTs ? `import mongoose from 'mongoose';
+
+export const connectDB = async (): Promise<void> => {
+  try {
+    const conn = await mongoose.connect(process.env.DATABASE_URL || 'mongodb://localhost:27017/${projectName}');
+    console.log(\`MongoDB Connected: \${conn.connection.host}\`);
+  } catch (error: any) {
+    console.error(\`Error connecting to MongoDB: \${error.message}\`);
+    process.exit(1);
+  }
+};` : `import mongoose from 'mongoose';
+
+export const connectDB = async () => {
+  try {
+    const conn = await mongoose.connect(process.env.DATABASE_URL || 'mongodb://localhost:27017/${projectName}');
+    console.log(\`MongoDB Connected: \${conn.connection.host}\`);
+  } catch (error) {
+    console.error(\`Error connecting to MongoDB: \${error.message}\`);
+    process.exit(1);
+  }
+};`;
+    } else if (database === 'prisma') {
+      dbContent = isTs ? `import { PrismaClient } from '@prisma/client';
+
+export const prisma = new PrismaClient();
+
+export const connectDB = async (): Promise<void> => {
+  try {
+    await prisma.$connect();
+    console.log('Database connected successfully via Prisma Client.');
+  } catch (error) {
+    console.error('Error connecting to database via Prisma Client:', error);
+    process.exit(1);
+  }
+};` : `import { PrismaClient } from '@prisma/client';
+
+export const prisma = new PrismaClient();
+
+export const connectDB = async () => {
+  try {
+    await prisma.$connect();
+    console.log('Database connected successfully via Prisma Client.');
+  } catch (error) {
+    console.error('Error connecting to database via Prisma Client:', error);
+    process.exit(1);
+  }
+};`;
+    } else {
+      dbContent = isTs ? `export const connectDB = async (): Promise<void> => {
+  console.log('No database selected. Running server without database connection.');
+};` : `export const connectDB = async () => {
+  console.log('No database selected. Running server without database connection.');
+};`;
+    }
+    writeProjectFile(`src/config/db.${ext}`, dbContent);
+
+    // Prisma Schema
+    if (database === 'prisma') {
+      const prismaSchema = `datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}`;
+      writeProjectFile('prisma/schema.prisma', prismaSchema);
+    }
+
+    // Auth middleware, controller, route, model
+    if (hasAuth) {
+      if (database === 'mongoose') {
+        const userModel = `import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
+
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true }
+}, {
+  timestamps: true
+});
+
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) {
+    next();
+  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+});
+
+userSchema.methods.matchPassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+const User = mongoose.model('User', userSchema);
+export default User;`;
+        writeProjectFile(`src/models/user.model.${ext}`, userModel);
+      }
+
+      const authPluginContent = isTs ? `import fp from 'fastify-plugin';
+import { FastifyPluginAsync } from 'fastify';
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    authenticate: any;
+  }
+}
+
+const authPlugin: FastifyPluginAsync = async (fastify, opts) => {
+  fastify.decorate('authenticate', async (request: any, reply: any) => {
+    try {
+      await request.jwtVerify();
+    } catch (err) {
+      reply.send(err);
+    }
+  });
+};
+
+export default fp(authPlugin);` : `import fp from 'fastify-plugin';
+
+export default fp(async (fastify, opts) => {
+  fastify.decorate('authenticate', async (request, reply) => {
+    try {
+      await request.jwtVerify();
+    } catch (err) {
+      reply.send(err);
+    }
+  });
+});`;
+      writeProjectFile(`src/plugins/auth.${ext}`, authPluginContent);
+
+      let controllerContent = '';
+      if (database === 'mongoose') {
+        controllerContent = isTs ? `import { FastifyRequest, FastifyReply } from 'fastify';
+import User from '../models/user.model.js';
+
+export const registerUser = async (request: FastifyRequest, reply: FastifyReply): Promise<any> => {
+  const { name, email, password } = request.body as any;
+  try {
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return reply.status(400).send({ message: 'User already exists' });
+    }
+    const user = await User.create({ name, email, password });
+    const token = await reply.jwtSign({ id: user._id });
+    return {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      token
+    };
+  } catch (error: any) {
+    return reply.status(500).send({ message: error.message });
+  }
+};
+
+export const loginUser = async (request: FastifyRequest, reply: FastifyReply): Promise<any> => {
+  const { email, password } = request.body as any;
+  try {
+    const user = await User.findOne({ email });
+    if (user && (await (user as any).matchPassword(password))) {
+      const token = await reply.jwtSign({ id: user._id });
+      return {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        token
+      };
+    } else {
+      return reply.status(401).send({ message: 'Invalid email or password' });
+    }
+  } catch (error: any) {
+    return reply.status(500).send({ message: error.message });
+  }
+};
+
+export const getMe = async (request: FastifyRequest, reply: FastifyReply): Promise<any> => {
+  try {
+    const user = await User.findById((request.user as any).id).select('-password');
+    return user;
+  } catch (error: any) {
+    return reply.status(500).send({ message: error.message });
+  }
+};` : `import User from '../models/user.model.js';
+
+export const registerUser = async (request, reply) => {
+  const { name, email, password } = request.body;
+  try {
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return reply.status(400).send({ message: 'User already exists' });
+    }
+    const user = await User.create({ name, email, password });
+    const token = await reply.jwtSign({ id: user._id });
+    return {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      token
+    };
+  } catch (error) {
+    return reply.status(500).send({ message: error.message });
+  }
+};
+
+export const loginUser = async (request, reply) => {
+  const { email, password } = request.body;
+  try {
+    const user = await User.findOne({ email });
+    if (user && (await user.matchPassword(password))) {
+      const token = await reply.jwtSign({ id: user._id });
+      return {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        token
+      };
+    } else {
+      return reply.status(401).send({ message: 'Invalid email or password' });
+    }
+  } catch (error) {
+    return reply.status(500).send({ message: error.message });
+  }
+};
+
+export const getMe = async (request, reply) => {
+  try {
+    const user = await User.findById(request.user.id).select('-password');
+    return user;
+  } catch (error) {
+    return reply.status(500).send({ message: error.message });
+  }
+};`;
+      } else if (database === 'prisma') {
+        controllerContent = isTs ? `import { FastifyRequest, FastifyReply } from 'fastify';
+import { prisma } from '../config/db.js';
+import bcrypt from 'bcryptjs';
+
+export const registerUser = async (request: FastifyRequest, reply: FastifyReply): Promise<any> => {
+  const { name, email, password } = request.body as any;
+  try {
+    const userExists = await prisma.user.findUnique({ where: { email } });
+    if (userExists) {
+      return reply.status(400).send({ message: 'User already exists' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: { name, email, password: hashedPassword }
+    });
+    const token = await reply.jwtSign({ id: user.id });
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      token
+    };
+  } catch (error: any) {
+    return reply.status(500).send({ message: error.message });
+  }
+};
+
+export const loginUser = async (request: FastifyRequest, reply: FastifyReply): Promise<any> => {
+  const { email, password } = request.body as any;
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user && (await bcrypt.compare(password, user.password))) {
+      const token = await reply.jwtSign({ id: user.id });
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        token
+      };
+    } else {
+      return reply.status(401).send({ message: 'Invalid email or password' });
+    }
+  } catch (error: any) {
+    return reply.status(500).send({ message: error.message });
+  }
+};
+
+export const getMe = async (request: FastifyRequest, reply: FastifyReply): Promise<any> => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: (request.user as any).id }
+    });
+    if (user) {
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    } else {
+      return reply.status(404).send({ message: 'User not found' });
+    }
+  } catch (error: any) {
+    return reply.status(500).send({ message: error.message });
+  }
+};` : `import { prisma } from '../config/db.js';
+import bcrypt from 'bcryptjs';
+
+export const registerUser = async (request, reply) => {
+  const { name, email, password } = request.body;
+  try {
+    const userExists = await prisma.user.findUnique({ where: { email } });
+    if (userExists) {
+      return reply.status(400).send({ message: 'User already exists' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: { name, email, password: hashedPassword }
+    });
+    const token = await reply.jwtSign({ id: user.id });
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      token
+    };
+  } catch (error) {
+    return reply.status(500).send({ message: error.message });
+  }
+};
+
+export const loginUser = async (request, reply) => {
+  const { email, password } = request.body;
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user && (await bcrypt.compare(password, user.password))) {
+      const token = await reply.jwtSign({ id: user.id });
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        token
+      };
+    } else {
+      return reply.status(401).send({ message: 'Invalid email or password' });
+    }
+  } catch (error) {
+    return reply.status(500).send({ message: error.message });
+  }
+};
+
+export const getMe = async (request, reply) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: request.user.id }
+    });
+    if (user) {
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    } else {
+      return reply.status(404).send({ message: 'User not found' });
+    }
+  } catch (error) {
+    return reply.status(500).send({ message: error.message });
+  }
+};`;
+      } else {
+        controllerContent = isTs ? `import { FastifyRequest, FastifyReply } from 'fastify';
+import bcrypt from 'bcryptjs';
+
+interface UserMock {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+}
+
+const users: UserMock[] = [];
+
+export const registerUser = async (request: FastifyRequest, reply: FastifyReply): Promise<any> => {
+  const { name, email, password } = request.body as any;
+  try {
+    const userExists = users.find(u => u.email === email);
+    if (userExists) {
+      return reply.status(400).send({ message: 'User already exists' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = { id: String(users.length + 1), name, email, password: hashedPassword };
+    users.push(user);
+    const token = await reply.jwtSign({ id: user.id });
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      token
+    };
+  } catch (error: any) {
+    return reply.status(500).send({ message: error.message });
+  }
+};
+
+export const loginUser = async (request: FastifyRequest, reply: FastifyReply): Promise<any> => {
+  const { email, password } = request.body as any;
+  try {
+    const user = users.find(u => u.email === email);
+    if (user && user.password && (await bcrypt.compare(password, user.password))) {
+      const token = await reply.jwtSign({ id: user.id });
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        token
+      };
+    } else {
+      return reply.status(401).send({ message: 'Invalid email or password' });
+    }
+  } catch (error: any) {
+    return reply.status(500).send({ message: error.message });
+  }
+};
+
+export const getMe = async (request: FastifyRequest, reply: FastifyReply): Promise<any> => {
+  const user = users.find(u => u.id === (request.user as any).id);
+  if (user) {
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  } else {
+    return reply.status(404).send({ message: 'User not found' });
+  }
+};` : `import bcrypt from 'bcryptjs';
+
+const users = [];
+
+export const registerUser = async (request, reply) => {
+  const { name, email, password } = request.body;
+  try {
+    const userExists = users.find(u => u.email === email);
+    if (userExists) {
+      return reply.status(400).send({ message: 'User already exists' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = { id: String(users.length + 1), name, email, password: hashedPassword };
+    users.push(user);
+    const token = await reply.jwtSign({ id: user.id });
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      token
+    };
+  } catch (error) {
+    return reply.status(500).send({ message: error.message });
+  }
+};
+
+export const loginUser = async (request, reply) => {
+  const { email, password } = request.body;
+  try {
+    const user = users.find(u => u.email === email);
+    if (user && (await bcrypt.compare(password, user.password))) {
+      const token = await reply.jwtSign({ id: user.id });
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        token
+      };
+    } else {
+      return reply.status(401).send({ message: 'Invalid email or password' });
+    }
+  } catch (error) {
+    return reply.status(500).send({ message: error.message });
+  }
+};
+
+export const getMe = async (request, reply) => {
+  const user = users.find(u => u.id === request.user.id);
+  if (user) {
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  } else {
+    return reply.status(404).send({ message: 'User not found' });
+  }
+};`;
+      }
+      writeProjectFile(`src/controllers/auth.controller.${ext}`, controllerContent);
+
+      const routesContent = isTs ? `import { FastifyInstance } from 'fastify';
+import { registerUser, loginUser, getMe } from '../controllers/auth.controller.js';
+
+export default async function authRoutes(fastify: FastifyInstance, opts: any) {
+  fastify.post('/register', registerUser);
+  fastify.post('/login', loginUser);
+  fastify.get('/me', { preHandler: [fastify.authenticate] }, getMe);
+}` : `import { registerUser, loginUser, getMe } from '../controllers/auth.controller.js';
+
+export default async function authRoutes(fastify, opts) {
+  fastify.post('/register', registerUser);
+  fastify.post('/login', loginUser);
+  fastify.get('/me', { preHandler: [fastify.authenticate] }, getMe);
+}`;
+      writeProjectFile(`src/routes/auth.routes.${ext}`, routesContent);
+    }
+
+    indexCode = isTs ? `import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import dotenv from 'dotenv';
+import { connectDB } from './config/db.js';
+${hasAuth ? "import jwt from '@fastify/jwt';\nimport authPlugin from './plugins/auth.js';\nimport authRoutes from './routes/auth.routes.js';" : ""}
 
 dotenv.config();
 
@@ -814,29 +1337,64 @@ const PORT = process.env.PORT || 5000;
 
 await fastify.register(cors);
 
+${hasAuth ? `await fastify.register(jwt, {
+  secret: process.env.JWT_SECRET || 'secret123'
+});
+await fastify.register(authPlugin);` : ""}
+
+// Connect Database
+await connectDB();
+
 fastify.get('/api/health', async (request, reply) => {
   return { status: 'ok', framework: 'Fastify', database: '${database}' };
 });
-`;
 
-    if (database === 'prisma') {
-      pkgJson.dependencies['@prisma/client'] = '^5.0.0';
-      pkgJson.devDependencies['prisma'] = '^5.0.0';
-    } else if (database === 'mongoose') {
-      pkgJson.dependencies['mongoose'] = '^7.0.0';
-    }
+${hasAuth ? "await fastify.register(authRoutes, { prefix: '/api/auth' });" : ""}
 
-    indexCode += `
 const start = async () => {
   try {
-    await fastify.listen({ port: PORT });
+    await fastify.listen({ port: Number(PORT), host: '0.0.0.0' });
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
   }
 };
-start();
-`;
+start();` : `import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import dotenv from 'dotenv';
+import { connectDB } from './config/db.js';
+${hasAuth ? "import jwt from '@fastify/jwt';\nimport authPlugin from './plugins/auth.js';\nimport authRoutes from './routes/auth.routes.js';" : ""}
+
+dotenv.config();
+
+const fastify = Fastify({ logger: true });
+const PORT = process.env.PORT || 5000;
+
+await fastify.register(cors);
+
+${hasAuth ? `await fastify.register(jwt, {
+  secret: process.env.JWT_SECRET || 'secret123'
+});
+await fastify.register(authPlugin);` : ""}
+
+// Connect Database
+await connectDB();
+
+fastify.get('/api/health', async (request, reply) => {
+  return { status: 'ok', framework: 'Fastify', database: '${database}' };
+});
+
+${hasAuth ? "await fastify.register(authRoutes, { prefix: '/api/auth' });" : ""}
+
+const start = async () => {
+  try {
+    await fastify.listen({ port: Number(PORT), host: '0.0.0.0' });
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
+start();`;
   }
 
   // Write files
