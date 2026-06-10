@@ -88,6 +88,14 @@ async function main() {
     if (dbChoice === '1') database = 'prisma';
     else if (dbChoice === '2') database = 'mongoose';
 
+    // 5. Select Authentication (JWT vs None)
+    console.log(`\n${bold}Select authentication starter code:${reset}`);
+    console.log(`  ${cyan}1)${reset} JWT Authentication ${dim}(User signup/login routes, middleware, & hashing)${reset}`);
+    console.log(`  ${cyan}2)${reset} None               ${dim}(Clean starter without auth logic)${reset}`);
+    let authChoice = await rl.question(`${bold}👉 Choose [1-2] (default: 1):${reset} `);
+    authChoice = authChoice.trim() || '1';
+    const auth = authChoice === '2' ? 'none' : 'jwt';
+
     rl.close();
 
     console.log(`\n${cyan}⚙ Scaffold settings:${reset}`);
@@ -95,6 +103,7 @@ async function main() {
     console.log(`  • Language:  ${green}${language === 'ts' ? 'TypeScript' : 'JavaScript'}${reset}`);
     console.log(`  • Framework: ${green}${framework}${reset}`);
     console.log(`  • Database:  ${green}${database}${reset}`);
+    console.log(`  • Auth:      ${green}${auth === 'jwt' ? 'JWT (jsonwebtoken + bcryptjs)' : 'None'}${reset}`);
 
     const templatesDir = path.resolve(__dirname, '../templates');
     const sourceDir = path.join(templatesDir, `${framework}-${database}-${language}`);
@@ -108,7 +117,7 @@ async function main() {
     if (fs.existsSync(sourceDir)) {
       fs.cpSync(sourceDir, targetDir, { recursive: true });
     } else {
-      createFallbackTemplate(targetDir, displayProjectName, framework, database, language);
+      createFallbackTemplate(targetDir, displayProjectName, framework, database, language, auth);
     }
 
     // Update package.json in targetDir with the new project name
@@ -138,9 +147,10 @@ async function main() {
   }
 }
 
-function createFallbackTemplate(targetDir, projectName, framework, database, language) {
+function createFallbackTemplate(targetDir, projectName, framework, database, language, auth) {
   const isTs = language === 'ts';
   const ext = isTs ? 'ts' : 'js';
+  const hasAuth = auth === 'jwt';
   
   // Setup fallback file structure
   const srcDir = path.join(targetDir, 'src');
