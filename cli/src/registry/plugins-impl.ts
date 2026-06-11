@@ -349,7 +349,7 @@ app.get('/api/health', async () => {
 ${ctx.auth !== 'none' ? `import authRoutes from './app/routes/auth.routes${sfx}';\napp.register(authRoutes, { prefix: '/api/auth' });` : ''}
 
 // Error Handler
-app.setErrorHandler((error, request, reply) => {
+app.setErrorHandler((error, req, reply) => {
   logger.error(\`Fastify Error: \${error.message}\`);
   reply.status(error.statusCode || 500).send({
     status: 'error',
@@ -379,7 +379,7 @@ app.get('/api/health', async () => {
 ${ctx.auth !== 'none' ? `import authRoutes from './app/routes/auth.routes${sfx}';\napp.register(authRoutes, { prefix: '/api/auth' });` : ''}
 
 // Error Handler
-app.setErrorHandler((error, request, reply) => {
+app.setErrorHandler((error, req, reply) => {
   logger.error(\`Fastify Error: \${error.message}\`);
   reply.status(error.statusCode || 500).send({
     status: 'error',
@@ -409,7 +409,7 @@ app.get('/api/health', async () => {
 ${ctx.auth !== 'none' ? "const authRoutes = require('./app/routes/auth.routes');\napp.register(authRoutes, { prefix: '/api/auth' });" : ''}
 
 // Error Handler
-app.setErrorHandler((error, request, reply) => {
+app.setErrorHandler((error, req, reply) => {
   logger.error(\`Fastify Error: \${error.message}\`);
   reply.status(error.statusCode || 500).send({
     status: 'error',
