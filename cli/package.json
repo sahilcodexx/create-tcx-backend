@@ -4,17 +4,19 @@
   "description": "CLI tool to quickly scaffold a TCX Backend application",
   "type": "module",
   "bin": {
-    "create-tcx-backend": "./bin/index.js"
+    "create-tcx-backend": "./dist/index.js"
   },
   "files": [
-    "bin",
+    "dist",
     "templates"
   ],
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
-    "start": "node bin/index.js"
+    "build": "tsup src/index.ts --format esm --clean --minify",
+    "dev": "tsup src/index.ts --format esm --watch",
+    "start": "node dist/index.js"
   },
   "keywords": [
     "create",
@@ -22,8 +24,26 @@
     "backend",
     "scaffold",
     "cli",
-    "boilerplate"
+    "boilerplate",
+    "express",
+    "fastify",
+    "hono"
   ],
   "author": "sahilcodexx",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "commander": "^12.1.0",
+    "execa": "^9.3.0",
+    "fs-extra": "^11.2.0",
+    "ora": "^8.0.1",
+    "picocolors": "^1.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^22.0.0",
+    "tsup": "^8.2.4",
+    "typescript": "^5.5.4"
+  }
 }
