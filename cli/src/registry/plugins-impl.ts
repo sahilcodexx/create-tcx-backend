@@ -10,8 +10,7 @@ const useEsm = (ctx: ProjectContext) => ctx.language === 'ts' || ctx.moduleSyste
 // Helper to format local imports/requires
 const getImport = (ctx: ProjectContext, varName: string, localPath: string) => {
   const isEsm = useEsm(ctx);
-  // ESM requires extensions, CJS must not have extensions
-  const pathWithExt = isEsm ? `${localPath}.js` : localPath;
+  const pathWithExt = ctx.moduleSystem === 'esm' ? `${localPath}.js` : localPath;
   return isEsm 
     ? `import ${varName} from '${pathWithExt}';`
     : `const ${varName} = require('${pathWithExt}');`;
@@ -19,7 +18,7 @@ const getImport = (ctx: ProjectContext, varName: string, localPath: string) => {
 
 const getNamedImport = (ctx: ProjectContext, names: string[], localPath: string) => {
   const isEsm = useEsm(ctx);
-  const pathWithExt = isEsm ? `${localPath}.js` : localPath;
+  const pathWithExt = ctx.moduleSystem === 'esm' ? `${localPath}.js` : localPath;
   const namesStr = names.join(', ');
   return isEsm
     ? `import { ${namesStr} } from '${pathWithExt}';`
@@ -31,8 +30,9 @@ const setupFolders = (ctx: ProjectContext) => {
   const ext = getExt(ctx);
   const isEsm = useEsm(ctx);
 
-  // Health Controller
-  ctx.files[`src/app/controllers/health.controller.${ext}`] = ctx.language === 'ts' ? `
+  // Health Controller (Only for Express, Fastify/Hono register route inline)
+  if (ctx.framework === 'express') {
+    ctx.files[`src/app/controllers/health.controller.${ext}`] = ctx.language === 'ts' ? `
 import { Request, Response } from 'express';
 
 export class HealthController {
@@ -67,6 +67,7 @@ class HealthController {
 
 module.exports = { HealthController };
 `);
+  }
 
   // Logger utility
   ctx.files[`src/utils/logger.${ext}`] = ctx.language === 'ts' ? `
@@ -141,6 +142,7 @@ registry.registerFramework('express', {
   onGenerate(ctx) {
     const ext = getExt(ctx);
     const isEsm = useEsm(ctx);
+    const sfx = ctx.moduleSystem === 'esm' ? '.js' : '';
     setupFolders(ctx);
 
     ctx.scripts['start'] = ctx.language === 'ts' ? 'node dist/server.js' : 'node src/server.js';
@@ -153,9 +155,9 @@ registry.registerFramework('express', {
     ctx.files[`src/app.${ext}`] = ctx.language === 'ts' ? `
 import express, { Express } from 'express';
 import cors from 'cors';
-import { HealthController } from './app/controllers/health.controller.js';
-import { errorHandler } from './app/middlewares/error.middleware.js';
-${ctx.auth !== 'none' ? "import authRoutes from './app/routes/auth.routes.js';" : ''}
+import { HealthController } from './app/controllers/health.controller${sfx}';
+import { errorHandler } from './app/middlewares/error.middleware${sfx}';
+${ctx.auth !== 'none' ? `import authRoutes from './app/routes/auth.routes${sfx}';` : ''}
 
 const app: Express = express();
 
@@ -165,7 +167,7 @@ app.use(express.json());
 // Routes
 app.get('/api/health', HealthController.check);
 
-${ctx.auth !== 'none' ? "app.use('/api/auth', authRoutes);" : ''}
+${ctx.auth !== 'none' ? `app.use('/api/auth', authRoutes);` : ''}
 
 // Error Handler
 app.use(errorHandler);
@@ -174,9 +176,9 @@ export default app;
 ` : (isEsm ? `
 import express from 'express';
 import cors from 'cors';
-import { HealthController } from './app/controllers/health.controller.js';
-import { errorHandler } from './app/middlewares/error.middleware.js';
-${ctx.auth !== 'none' ? "import authRoutes from './app/routes/auth.routes.js';" : ''}
+import { HealthController } from './app/controllers/health.controller${sfx}';
+import { errorHandler } from './app/middlewares/error.middleware${sfx}';
+${ctx.auth !== 'none' ? `import authRoutes from './app/routes/auth.routes${sfx}';` : ''}
 
 const app = express();
 
@@ -186,7 +188,7 @@ app.use(express.json());
 // Routes
 app.get('/api/health', HealthController.check);
 
-${ctx.auth !== 'none' ? "app.use('/api/auth', authRoutes);" : ''}
+${ctx.auth !== 'none' ? `app.use('/api/auth', authRoutes);` : ''}
 
 // Error Handler
 app.use(errorHandler);
@@ -217,10 +219,10 @@ module.exports = app;
 
     // src/server.ts
     ctx.files[`src/server.${ext}`] = isEsm ? `
-import app from './app.js';
-import { config } from './config/index.js';
-import { logger } from './utils/logger.js';
-import { connectDatabase } from './database/index.js';
+import app from './app${sfx}';
+import { config } from './config/index${sfx}';
+import { logger } from './utils/logger${sfx}';
+import { connectDatabase } from './database/index${sfx}';
 
 const start = async () => {
   try {
@@ -259,7 +261,7 @@ start();
     // src/app/middlewares/error.middleware.ts
     ctx.files[`src/app/middlewares/error.middleware.${ext}`] = ctx.language === 'ts' ? `
 import { Request, Response, NextFunction } from 'express';
-import { logger } from '../../utils/logger.js';
+import { logger } from '../../utils/logger${sfx}';
 
 export const errorHandler = (
   err: any,
@@ -275,7 +277,7 @@ export const errorHandler = (
   });
 };
 ` : (isEsm ? `
-import { logger } from '../../utils/logger.js';
+import { logger } from '../../utils/logger${sfx}';
 
 export const errorHandler = (err, req, res, next) => {
   logger.error(\`Express Error: \${err.message}\`);
@@ -316,6 +318,7 @@ registry.registerFramework('fastify', {
   onGenerate(ctx) {
     const ext = getExt(ctx);
     const isEsm = useEsm(ctx);
+    const sfx = ctx.moduleSystem === 'esm' ? '.js' : '';
     setupFolders(ctx);
 
     ctx.scripts['start'] = ctx.language === 'ts' ? 'node dist/server.js' : 'node src/server.js';
@@ -328,7 +331,7 @@ registry.registerFramework('fastify', {
     ctx.files[`src/app.${ext}`] = ctx.language === 'ts' ? `
 import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
-import { logger } from './utils/logger.js';
+import { logger } from './utils/logger${sfx}';
 
 const app: FastifyInstance = Fastify({ logger: false });
 
@@ -343,7 +346,7 @@ app.get('/api/health', async () => {
   };
 });
 
-${ctx.auth !== 'none' ? "import authRoutes from './app/routes/auth.routes.js';\napp.register(authRoutes, { prefix: '/api/auth' });" : ''}
+${ctx.auth !== 'none' ? `import authRoutes from './app/routes/auth.routes${sfx}';\napp.register(authRoutes, { prefix: '/api/auth' });` : ''}
 
 // Error Handler
 app.setErrorHandler((error, request, reply) => {
@@ -358,7 +361,7 @@ export default app;
 ` : (isEsm ? `
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { logger } from './utils/logger.js';
+import { logger } from './utils/logger${sfx}';
 
 const app = Fastify({ logger: false });
 
@@ -373,7 +376,7 @@ app.get('/api/health', async () => {
   };
 });
 
-${ctx.auth !== 'none' ? "import authRoutes from './app/routes/auth.routes.js';\napp.register(authRoutes, { prefix: '/api/auth' });" : ''}
+${ctx.auth !== 'none' ? `import authRoutes from './app/routes/auth.routes${sfx}';\napp.register(authRoutes, { prefix: '/api/auth' });` : ''}
 
 // Error Handler
 app.setErrorHandler((error, request, reply) => {
@@ -419,10 +422,10 @@ module.exports = app;
 
     // src/server.ts
     ctx.files[`src/server.${ext}`] = isEsm ? `
-import app from './app.js';
-import { config } from './config/index.js';
-import { logger } from './utils/logger.js';
-import { connectDatabase } from './database/index.js';
+import app from './app${sfx}';
+import { config } from './config/index${sfx}';
+import { logger } from './utils/logger${sfx}';
+import { connectDatabase } from './database/index${sfx}';
 
 const start = async () => {
   try {
@@ -458,7 +461,7 @@ start();
   }
 });
 
-// Hono Plugin (Always ESM since Hono is modern ESM native)
+// Hono Plugin
 registry.registerFramework('hono', {
   name: 'hono',
   onInstall(ctx) {
@@ -471,6 +474,7 @@ registry.registerFramework('hono', {
   },
   onGenerate(ctx) {
     const ext = getExt(ctx);
+    const sfx = ctx.moduleSystem === 'esm' ? '.js' : '';
     setupFolders(ctx);
 
     ctx.scripts['start'] = ctx.language === 'ts' ? 'node dist/server.js' : 'node src/server.js';
@@ -479,11 +483,11 @@ registry.registerFramework('hono', {
       ctx.scripts['build'] = 'tsc';
     }
 
-    // src/app.ts (Hono codebase stays in ESM regardless of config since Hono uses standard ESM loaders)
+    // src/app.ts
     ctx.files[`src/app.${ext}`] = `
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger } from './utils/logger.js';
+import { logger } from './utils/logger${sfx}';
 
 const app = new Hono();
 
@@ -497,7 +501,7 @@ app.get('/api/health', (c) => {
   });
 });
 
-${ctx.auth !== 'none' ? "import authRoutes from './app/routes/auth.routes.js';\napp.route('/api/auth', authRoutes);" : ''}
+${ctx.auth !== 'none' ? `import authRoutes from './app/routes/auth.routes${sfx}';\napp.route('/api/auth', authRoutes);` : ''}
 
 app.onError((err, c) => {
   logger.error(\`Hono Error: \${err.message}\`);
@@ -513,10 +517,10 @@ export default app;
     // src/server.ts
     ctx.files[`src/server.${ext}`] = `
 import { serve } from '@hono/node-server';
-import app from './app.js';
-import { config } from './config/index.js';
-import { logger } from './utils/logger.js';
-import { connectDatabase } from './database/index.js';
+import app from './app${sfx}';
+import { config } from './config/index${sfx}';
+import { logger } from './utils/logger${sfx}';
+import { connectDatabase } from './database/index${sfx}';
 
 const start = async () => {
   try {
@@ -548,8 +552,9 @@ registry.registerDatabase('none', {
   onGenerate(ctx) {
     const ext = getExt(ctx);
     const isEsm = useEsm(ctx);
+    const sfx = ctx.moduleSystem === 'esm' ? '.js' : '';
     ctx.files[`src/database/index.${ext}`] = isEsm ? `
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger${sfx}';
 
 export const connectDatabase = async () => {
   logger.info('No database connection configured.');
@@ -577,11 +582,12 @@ registry.registerORM('mongoose', {
   onGenerate(ctx) {
     const ext = getExt(ctx);
     const isEsm = useEsm(ctx);
+    const sfx = ctx.moduleSystem === 'esm' ? '.js' : '';
     ctx.env['DATABASE_URL'] = 'mongodb://localhost:27017/tcx_backend';
 
     ctx.files[`src/database/index.${ext}`] = isEsm ? `
 import mongoose from 'mongoose';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger${sfx}';
 
 export const connectDatabase = async () => {
   const url = process.env.DATABASE_URL || 'mongodb://localhost:27017/tcx_backend';
@@ -623,6 +629,7 @@ registry.registerORM('prisma', {
   onGenerate(ctx) {
     const ext = getExt(ctx);
     const isEsm = useEsm(ctx);
+    const sfx = ctx.moduleSystem === 'esm' ? '.js' : '';
     let provider = 'postgresql';
     let urlValue = 'postgresql://johndoe:randompassword@localhost:5432/mydb?schema=public';
 
@@ -638,7 +645,7 @@ registry.registerORM('prisma', {
 
     ctx.files[`src/database/index.${ext}`] = isEsm ? `
 import { PrismaClient } from '@prisma/client';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger${sfx}';
 
 export const prisma = new PrismaClient();
 
@@ -719,6 +726,7 @@ registry.registerORM('drizzle', {
   onGenerate(ctx) {
     const ext = getExt(ctx);
     const isEsm = useEsm(ctx);
+    const sfx = ctx.moduleSystem === 'esm' ? '.js' : '';
     let dbType = 'postgresql';
     let connString = 'postgresql://johndoe:randompassword@localhost:5432/mydb';
 
@@ -777,7 +785,7 @@ module.exports = { users };
       dbImports = isEsm ? `
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
-import * as schema from './schema.js';
+import * as schema from './schema${sfx}';
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL || '${connString}',
@@ -797,7 +805,7 @@ const db = drizzle(pool, { schema });
       dbImports = isEsm ? `
 import { drizzle } from 'drizzle-orm/mysql2';
 import mysql from 'mysql2/promise';
-import * as schema from './schema.js';
+import * as schema from './schema${sfx}';
 
 const connection = await mysql.createConnection(process.env.DATABASE_URL || '${connString}');
 export const db = drizzle(connection, { schema });
@@ -806,7 +814,6 @@ const { drizzle } = require('drizzle-orm/mysql2');
 const mysql = require('mysql2/promise');
 const schema = require('./schema');
 
-// Top level await is restricted in CJS, connection is initialized inside connectDatabase
 let db;
 `;
     } else {
@@ -814,7 +821,7 @@ let db;
       dbImports = isEsm ? `
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
-import * as schema from './schema.js';
+import * as schema from './schema${sfx}';
 
 const sqlite = new Database(process.env.DATABASE_URL || 'dev.db');
 export const db = drizzle(sqlite, { schema });
@@ -830,7 +837,7 @@ const db = drizzle(sqlite, { schema });
 
     ctx.files[`src/database/index.${ext}`] = isEsm ? `
 ${dbImports}
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger${sfx}';
 
 export const connectDatabase = async () => {
   logger.info('🔌 Connected to database via Drizzle ORM');
@@ -860,7 +867,7 @@ module.exports = { connectDatabase${ctx.database !== 'mysql' ? ', db' : ''} };
 });
 
 // PostgreSQL / MySQL / SQLite Native Plugins (without ORM)
-const registerNativeDb = (name: string, dep: string, connectCodeEsm: string, connectCodeCjs: string, typesDep?: string) => {
+const registerNativeDb = (name: string, dep: string, connectCodeEsm: (sfx: string) => string, connectCodeCjs: string, typesDep?: string) => {
   registry.registerDatabase(name, {
     name: `${name}-db`,
     onInstall(ctx) {
@@ -874,16 +881,17 @@ const registerNativeDb = (name: string, dep: string, connectCodeEsm: string, con
     onGenerate(ctx) {
       const ext = getExt(ctx);
       const isEsm = useEsm(ctx);
+      const sfx = ctx.moduleSystem === 'esm' ? '.js' : '';
       if (ctx.orm === 'none') {
-        ctx.files[`src/database/index.${ext}`] = isEsm ? connectCodeEsm : connectCodeCjs;
+        ctx.files[`src/database/index.${ext}`] = isEsm ? connectCodeEsm(sfx) : connectCodeCjs;
       }
     }
   });
 };
 
-registerNativeDb('postgres', 'pg', `
+registerNativeDb('postgres', 'pg', (sfx) => `
 import pg from 'pg';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger${sfx}';
 
 export const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/mydb'
@@ -919,9 +927,9 @@ const connectDatabase = async () => {
 module.exports = { pool, connectDatabase };
 `, '@types/pg');
 
-registerNativeDb('mysql', 'mysql2', `
+registerNativeDb('mysql', 'mysql2', (sfx) => `
 import mysql from 'mysql2/promise';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger${sfx}';
 
 export let connection: mysql.Connection;
 
@@ -953,9 +961,9 @@ const connectDatabase = async () => {
 module.exports = { connectDatabase };
 `);
 
-registerNativeDb('sqlite', 'better-sqlite3', `
+registerNativeDb('sqlite', 'better-sqlite3', (sfx) => `
 import Database from 'better-sqlite3';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger${sfx}';
 
 export let db: Database.Database;
 
@@ -987,9 +995,9 @@ const connectDatabase = async () => {
 module.exports = { connectDatabase };
 `, '@types/better-sqlite3');
 
-registerNativeDb('mongodb', 'mongodb', `
+registerNativeDb('mongodb', 'mongodb', (sfx) => `
 import { MongoClient } from 'mongodb';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger${sfx}';
 
 const url = process.env.DATABASE_URL || 'mongodb://localhost:27017';
 export const client = new MongoClient(url);
@@ -1045,12 +1053,14 @@ registry.registerPlugin('auth-jwt', {
   onGenerate(ctx) {
     const ext = getExt(ctx);
     const isEsm = useEsm(ctx);
+    const sfx = ctx.moduleSystem === 'esm' ? '.js' : '';
 
-    // Auth Middleware
-    ctx.files[`src/app/middlewares/auth.middleware.${ext}`] = ctx.language === 'ts' ? `
+    if (ctx.framework === 'express') {
+      // Express Auth Middleware
+      ctx.files[`src/app/middlewares/auth.middleware.${ext}`] = ctx.language === 'ts' ? `
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { config } from '../../config/index.js';
+import { config } from '../../config/index${sfx}';
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -1077,7 +1087,7 @@ export const protect = (req: AuthRequest, res: Response, next: NextFunction): vo
 };
 ` : (isEsm ? `
 import jwt from 'jsonwebtoken';
-import { config } from '../../config/index.js';
+import { config } from '../../config/index${sfx}';
 
 export const protect = (req, res, next) => {
   let token;
@@ -1123,12 +1133,12 @@ const protect = (req, res, next) => {
 module.exports = { protect };
 `);
 
-    // Auth controller
-    ctx.files[`src/app/controllers/auth.controller.${ext}`] = ctx.language === 'ts' ? `
+      // Express Auth controller
+      ctx.files[`src/app/controllers/auth.controller.${ext}`] = ctx.language === 'ts' ? `
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { config } from '../../config/index.js';
+import { config } from '../../config/index${sfx}';
 
 export class AuthController {
   public static async register(req: Request, res: Response): Promise<void> {
@@ -1155,7 +1165,7 @@ export class AuthController {
 ` : (isEsm ? `
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { config } from '../../config/index.js';
+import { config } from '../../config/index${sfx}';
 
 export class AuthController {
   static async register(req, res) {
@@ -1210,11 +1220,11 @@ class AuthController {
 module.exports = { AuthController };
 `);
 
-    // Auth Routes
-    ctx.files[`src/app/routes/auth.routes.${ext}`] = isEsm ? `
+      // Express Auth Routes
+      ctx.files[`src/app/routes/auth.routes.${ext}`] = isEsm ? `
 import { Router } from 'express';
-import { AuthController } from '../controllers/auth.controller.js';
-import { protect } from '../middlewares/auth.middleware.js';
+import { AuthController } from '../controllers/auth.controller${sfx}';
+import { protect } from '../middlewares/auth.middleware${sfx}';
 
 const router = Router();
 
@@ -1240,6 +1250,385 @@ router.get('/me', protect, (req, res) => {
 
 module.exports = router;
 `;
+    } else if (ctx.framework === 'fastify') {
+      // Fastify Auth Middleware
+      ctx.files[`src/app/middlewares/auth.middleware.${ext}`] = ctx.language === 'ts' ? `
+import { FastifyRequest, FastifyReply } from 'fastify';
+import jwt from 'jsonwebtoken';
+import { config } from '../../config/index${sfx}';
+
+export const protect = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  let token: string | undefined;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  if (!token) {
+    reply.status(401).send({ message: 'Not authorized, token required' });
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret);
+    (req as any).user = decoded;
+  } catch (error) {
+    reply.status(401).send({ message: 'Not authorized, invalid token' });
+  }
+};
+` : (isEsm ? `
+import jwt from 'jsonwebtoken';
+import { config } from '../../config/index${sfx}';
+
+export const protect = async (req, reply) => {
+  let token;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  if (!token) {
+    return reply.status(401).send({ message: 'Not authorized, token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret);
+    req.user = decoded;
+  } catch (error) {
+    return reply.status(401).send({ message: 'Not authorized, invalid token' });
+  }
+};
+` : `
+const jwt = require('jsonwebtoken');
+const { config } = require('../../config/index');
+
+const protect = async (req, reply) => {
+  let token;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  if (!token) {
+    return reply.status(401).send({ message: 'Not authorized, token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret);
+    req.user = decoded;
+  } catch (error) {
+    return reply.status(401).send({ message: 'Not authorized, invalid token' });
+  }
+};
+
+module.exports = { protect };
+`);
+
+      // Fastify Auth Controller
+      ctx.files[`src/app/controllers/auth.controller.${ext}`] = ctx.language === 'ts' ? `
+import { FastifyRequest, FastifyReply } from 'fastify';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { config } from '../../config/index${sfx}';
+
+export class AuthController {
+  public static async register(req: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const { name, email, password } = req.body as any;
+    try {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const token = jwt.sign({ name, email }, config.jwtSecret, { expiresIn: '30d' });
+      reply.status(201).send({ name, email, token });
+    } catch (err: any) {
+      reply.status(500).send({ message: err.message });
+    }
+  }
+
+  public static async login(req: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const { email, password } = req.body as any;
+    try {
+      const token = jwt.sign({ email }, config.jwtSecret, { expiresIn: '30d' });
+      reply.status(200).send({ email, token });
+    } catch (err: any) {
+      reply.status(500).send({ message: err.message });
+    }
+  }
+}
+` : (isEsm ? `
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { config } from '../../config/index${sfx}';
+
+export class AuthController {
+  static async register(req, reply) {
+    const { name, email, password } = req.body;
+    try {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const token = jwt.sign({ name, email }, config.jwtSecret, { expiresIn: '30d' });
+      reply.status(201).send({ name, email, token });
+    } catch (err) {
+      reply.status(500).send({ message: err.message });
+    }
+  }
+
+  static async login(req, reply) {
+    const { email, password } = req.body;
+    try {
+      const token = jwt.sign({ email }, config.jwtSecret, { expiresIn: '30d' });
+      reply.status(200).send({ email, token });
+    } catch (err) {
+      reply.status(500).send({ message: err.message });
+    }
+  }
+}
+` : `
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { config } = require('../../config/index');
+
+class AuthController {
+  static async register(req, reply) {
+    const { name, email, password } = req.body;
+    try {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const token = jwt.sign({ name, email }, config.jwtSecret, { expiresIn: '30d' });
+      reply.status(201).send({ name, email, token });
+    } catch (err) {
+      reply.status(500).send({ message: err.message });
+    }
+  }
+
+  static async login(req, reply) {
+    const { email, password } = req.body;
+    try {
+      const token = jwt.sign({ email }, config.jwtSecret, { expiresIn: '30d' });
+      reply.status(200).send({ email, token });
+    } catch (err) {
+      reply.status(500).send({ message: err.message });
+    }
+  }
+}
+
+module.exports = { AuthController };
+`);
+
+      // Fastify Auth Routes
+      ctx.files[`src/app/routes/auth.routes.${ext}`] = isEsm ? `
+import { FastifyInstance } from 'fastify';
+import { AuthController } from '../controllers/auth.controller${sfx}';
+import { protect } from '../middlewares/auth.middleware${sfx}';
+
+export default async function authRoutes(fastify: FastifyInstance) {
+  fastify.post('/register', AuthController.register);
+  fastify.post('/login', AuthController.login);
+  fastify.get('/me', { preHandler: [protect] }, (req, reply) => {
+    reply.send({ user: (req as any).user });
+  });
+}
+` : `
+const { AuthController } = require('../controllers/auth.controller');
+const { protect } = require('../middlewares/auth.middleware');
+
+async function authRoutes(fastify) {
+  fastify.post('/register', AuthController.register);
+  fastify.post('/login', AuthController.login);
+  fastify.get('/me', { preHandler: [protect] }, (req, reply) => {
+    reply.send({ user: req.user });
+  });
+}
+
+module.exports = authRoutes;
+`;
+    } else if (ctx.framework === 'hono') {
+      // Hono Auth Middleware
+      ctx.files[`src/app/middlewares/auth.middleware.${ext}`] = ctx.language === 'ts' ? `
+import { Context, Next } from 'hono';
+import jwt from 'jsonwebtoken';
+import { config } from '../../config/index${sfx}';
+
+export const protect = async (c: Context, next: Next) => {
+  let token: string | undefined;
+  const authHeader = c.req.header('authorization');
+  if (authHeader && authHeader.startsWith('Bearer')) {
+    token = authHeader.split(' ')[1];
+  }
+
+  if (!token) {
+    return c.json({ message: 'Not authorized, token required' }, 401);
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret);
+    (c.req as any).user = decoded;
+    await next();
+  } catch (error) {
+    return c.json({ message: 'Not authorized, invalid token' }, 401);
+  }
+};
+` : (isEsm ? `
+import jwt from 'jsonwebtoken';
+import { config } from '../../config/index${sfx}';
+
+export const protect = async (c, next) => {
+  let token;
+  const authHeader = c.req.header('authorization');
+  if (authHeader && authHeader.startsWith('Bearer')) {
+    token = authHeader.split(' ')[1];
+  }
+
+  if (!token) {
+    return c.json({ message: 'Not authorized, token required' }, 401);
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret);
+    c.req.user = decoded;
+    await next();
+  } catch (error) {
+    return c.json({ message: 'Not authorized, invalid token' }, 401);
+  }
+};
+` : `
+const jwt = require('jsonwebtoken');
+const { config } = require('../../config/index');
+
+const protect = async (c, next) => {
+  let token;
+  const authHeader = c.req.header('authorization');
+  if (authHeader && authHeader.startsWith('Bearer')) {
+    token = authHeader.split(' ')[1];
+  }
+
+  if (!token) {
+    return c.json({ message: 'Not authorized, token required' }, 401);
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret);
+    c.req.user = decoded;
+    await next();
+  } catch (error) {
+    return c.json({ message: 'Not authorized, invalid token' }, 401);
+  }
+};
+
+module.exports = { protect };
+`);
+
+      // Hono Auth Controller
+      ctx.files[`src/app/controllers/auth.controller.${ext}`] = ctx.language === 'ts' ? `
+import { Context } from 'hono';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { config } from '../../config/index${sfx}';
+
+export class AuthController {
+  public static async register(c: Context) {
+    try {
+      const { name, email, password } = await c.req.json();
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const token = jwt.sign({ name, email }, config.jwtSecret, { expiresIn: '30d' });
+      return c.json({ name, email, token }, 201);
+    } catch (err: any) {
+      return c.json({ message: err.message }, 500);
+    }
+  }
+
+  public static async login(c: Context) {
+    try {
+      const { email, password } = await c.req.json();
+      const token = jwt.sign({ email }, config.jwtSecret, { expiresIn: '30d' });
+      return c.json({ email, token }, 200);
+    } catch (err: any) {
+      return c.json({ message: err.message }, 500);
+    }
+  }
+}
+` : (isEsm ? `
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { config } from '../../config/index${sfx}';
+
+export class AuthController {
+  static async register(c) {
+    try {
+      const { name, email, password } = await c.req.json();
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const token = jwt.sign({ name, email }, config.jwtSecret, { expiresIn: '30d' });
+      return c.json({ name, email, token }, 201);
+    } catch (err) {
+      return c.json({ message: err.message }, 500);
+    }
+  }
+
+  static async login(c) {
+    try {
+      const { email, password } = await c.req.json();
+      const token = jwt.sign({ email }, config.jwtSecret, { expiresIn: '30d' });
+      return c.json({ email, token }, 200);
+    } catch (err) {
+      return c.json({ message: err.message }, 500);
+    }
+  }
+}
+` : `
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { config } = require('../../config/index');
+
+class AuthController {
+  static async register(c) {
+    try {
+      const { name, email, password } = await c.req.json();
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const token = jwt.sign({ name, email }, config.jwtSecret, { expiresIn: '30d' });
+      return c.json({ name, email, token }, 201);
+    } catch (err) {
+      return c.json({ message: err.message }, 500);
+    }
+  }
+
+  static async login(c) {
+    try {
+      const { email, password } = await c.req.json();
+      const token = jwt.sign({ email }, config.jwtSecret, { expiresIn: '30d' });
+      return c.json({ email, token }, 200);
+    } catch (err) {
+      return c.json({ message: err.message }, 500);
+    }
+  }
+}
+
+module.exports = { AuthController };
+`);
+
+      // Hono Auth Routes
+      ctx.files[`src/app/routes/auth.routes.${ext}`] = isEsm ? `
+import { Hono } from 'hono';
+import { AuthController } from '../controllers/auth.controller${sfx}';
+import { protect } from '../middlewares/auth.middleware${sfx}';
+
+const router = new Hono();
+
+router.post('/register', AuthController.register);
+router.post('/login', AuthController.login);
+router.get('/me', protect, (c) => {
+  return c.json({ user: (c.req as any).user });
+});
+
+export default router;
+` : `
+const { Hono } = require('hono');
+const { AuthController } = require('../controllers/auth.controller');
+const { protect } = require('../middlewares/auth.middleware');
+
+const router = new Hono();
+
+router.post('/register', AuthController.register);
+router.post('/login', AuthController.login);
+router.get('/me', protect, (c) => {
+  return c.json({ user: c.req.user });
+});
+
+module.exports = router;
+`;
+    }
   }
 });
 
@@ -1276,7 +1665,8 @@ registry.registerPlugin('validation-zod', {
     const ext = getExt(ctx);
     const isEsm = useEsm(ctx);
 
-    ctx.files[`src/app/middlewares/validation.middleware.${ext}`] = ctx.language === 'ts' ? `
+    if (ctx.framework === 'express') {
+      ctx.files[`src/app/middlewares/validation.middleware.${ext}`] = ctx.language === 'ts' ? `
 import { Request, Response, NextFunction } from 'express';
 import { ZodSchema } from 'zod';
 
@@ -1327,6 +1717,111 @@ const validateBody = (schema) => {
 
 module.exports = { validateBody };
 `);
+    } else if (ctx.framework === 'fastify') {
+      ctx.files[`src/app/middlewares/validation.middleware.${ext}`] = ctx.language === 'ts' ? `
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { ZodSchema } from 'zod';
+
+export const validateBody = (schema: ZodSchema) => {
+  return async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    try {
+      schema.parse(req.body);
+    } catch (error: any) {
+      reply.status(400).send({
+        status: 'error',
+        message: 'Validation failed',
+        errors: error.errors
+      });
+    }
+  };
+};
+` : (isEsm ? `
+export const validateBody = (schema) => {
+  return async (req, reply) => {
+    try {
+      schema.parse(req.body);
+    } catch (error) {
+      return reply.status(400).send({
+        status: 'error',
+        message: 'Validation failed',
+        errors: error.errors
+      });
+    }
+  };
+};
+` : `
+const validateBody = (schema) => {
+  return async (req, reply) => {
+    try {
+      schema.parse(req.body);
+    } catch (error) {
+      return reply.status(400).send({
+        status: 'error',
+        message: 'Validation failed',
+        errors: error.errors
+      });
+    }
+  };
+};
+
+module.exports = { validateBody };
+`);
+    } else if (ctx.framework === 'hono') {
+      ctx.files[`src/app/middlewares/validation.middleware.${ext}`] = ctx.language === 'ts' ? `
+import { Context, Next } from 'hono';
+import { ZodSchema } from 'zod';
+
+export const validateBody = (schema: ZodSchema) => {
+  return async (c: Context, next: Next) => {
+    try {
+      const body = await c.req.json();
+      schema.parse(body);
+      await next();
+    } catch (error: any) {
+      return c.json({
+        status: 'error',
+        message: 'Validation failed',
+        errors: error.errors
+      }, 400);
+    }
+  };
+};
+` : (isEsm ? `
+export const validateBody = (schema) => {
+  return async (c, next) => {
+    try {
+      const body = await c.req.json();
+      schema.parse(body);
+      await next();
+    } catch (error) {
+      return c.json({
+        status: 'error',
+        message: 'Validation failed',
+        errors: error.errors
+      }, 400);
+    }
+  };
+};
+` : `
+const validateBody = (schema) => {
+  return async (c, next) => {
+    try {
+      const body = await c.req.json();
+      schema.parse(body);
+      await next();
+    } catch (error) {
+      return c.json({
+        status: 'error',
+        message: 'Validation failed',
+        errors: error.errors
+      }, 400);
+    }
+  };
+};
+
+module.exports = { validateBody };
+`);
+    }
   }
 });
 
@@ -1334,7 +1829,6 @@ module.exports = { validateBody };
 registry.registerPlugin('docker', {
   name: 'docker',
   onGenerate(ctx) {
-    const isEsm = useEsm(ctx);
     ctx.files['Dockerfile'] = `
 FROM node:22-alpine AS builder
 WORKDIR /app
@@ -1442,9 +1936,11 @@ registry.registerPlugin('eslint', {
   name: 'eslint',
   onInstall(ctx) {
     ctx.devDependencies['eslint'] = '^9.0.0';
+    ctx.devDependencies['@eslint/js'] = '^9.0.0';
     if (ctx.language === 'ts') {
-      ctx.devDependencies['@typescript-eslint/eslint-plugin'] = '^7.0.0';
-      ctx.devDependencies['@typescript-eslint/parser'] = '^7.0.0';
+      ctx.devDependencies['typescript-eslint'] = '^8.0.0';
+      ctx.devDependencies['@typescript-eslint/eslint-plugin'] = '^8.0.0';
+      ctx.devDependencies['@typescript-eslint/parser'] = '^8.0.0';
     }
   },
   onGenerate(ctx) {
