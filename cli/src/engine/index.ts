@@ -22,11 +22,12 @@ export async function generateProject(ctx: ProjectContext): Promise<void> {
       ctx.devDependencies['@types/node'] = '^22.0.0';
       
       // tsconfig.json
+      const isEsm = ctx.moduleSystem === 'esm';
       ctx.files['tsconfig.json'] = JSON.stringify({
         compilerOptions: {
           target: 'ES2022',
-          module: 'NodeNext',
-          moduleResolution: 'NodeNext',
+          module: isEsm ? 'NodeNext' : 'CommonJS',
+          moduleResolution: isEsm ? 'NodeNext' : 'Node',
           esModuleInterop: true,
           strict: true,
           skipLibCheck: true,
@@ -50,11 +51,10 @@ export async function generateProject(ctx: ProjectContext): Promise<void> {
     }
 
     // 4. Construct package.json
-    const basePackageJson = {
+    const basePackageJson: any = {
       name: ctx.projectName,
       version: '1.0.0',
       private: true,
-      type: 'module',
       scripts: {
         ...ctx.scripts
       },
@@ -65,6 +65,10 @@ export async function generateProject(ctx: ProjectContext): Promise<void> {
         ...ctx.devDependencies
       }
     };
+
+    if (ctx.moduleSystem === 'esm') {
+      basePackageJson.type = 'module';
+    }
 
     fs.writeFileSync(
       path.join(ctx.targetDir, 'package.json'),

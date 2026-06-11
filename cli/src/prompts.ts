@@ -106,6 +106,20 @@ export async function askQuestions(): Promise<ProjectContext | null> {
     return null;
   }
 
+  // Module System Selection
+  const moduleSystem = await p.select({
+    message: 'Select module system:',
+    options: [
+      { value: 'esm', label: 'ES Modules (import/export)' },
+      { value: 'cjs', label: 'CommonJS (require/module.exports)' }
+    ]
+  });
+
+  if (p.isCancel(moduleSystem)) {
+    p.cancel('Scaffolding cancelled.');
+    return null;
+  }
+
   // 5. Database
   const database = await p.select({
     message: 'Select a database:',
@@ -218,6 +232,7 @@ export async function askQuestions(): Promise<ProjectContext | null> {
     packageManager: packageManager as any,
     framework: framework as any,
     language: language as any,
+    moduleSystem: moduleSystem as any,
     database: database as any,
     orm: orm as any,
     auth: auth as any,

@@ -4,10 +4,34 @@ import { ProjectContext } from './types.js';
 // Helper to check if TypeScript is used
 const getExt = (ctx: ProjectContext) => ctx.language === 'ts' ? 'ts' : 'js';
 
-// Helper to create basic folders
+// Helper to determine module system
+const useEsm = (ctx: ProjectContext) => ctx.language === 'ts' || ctx.moduleSystem === 'esm';
+
+// Helper to format local imports/requires
+const getImport = (ctx: ProjectContext, varName: string, localPath: string) => {
+  const isEsm = useEsm(ctx);
+  // ESM requires extensions, CJS must not have extensions
+  const pathWithExt = isEsm ? `${localPath}.js` : localPath;
+  return isEsm 
+    ? `import ${varName} from '${pathWithExt}';`
+    : `const ${varName} = require('${pathWithExt}');`;
+};
+
+const getNamedImport = (ctx: ProjectContext, names: string[], localPath: string) => {
+  const isEsm = useEsm(ctx);
+  const pathWithExt = isEsm ? `${localPath}.js` : localPath;
+  const namesStr = names.join(', ');
+  return isEsm
+    ? `import { ${namesStr} } from '${pathWithExt}';`
+    : `const { ${namesStr} } = require('${pathWithExt}');`;
+};
+
+// Helper to create basic folders and files
 const setupFolders = (ctx: ProjectContext) => {
   const ext = getExt(ctx);
-  // Base health controller and routes
+  const isEsm = useEsm(ctx);
+
+  // Health Controller
   ctx.files[`src/app/controllers/health.controller.${ext}`] = ctx.language === 'ts' ? `
 import { Request, Response } from 'express';
 
@@ -20,7 +44,7 @@ export class HealthController {
     });
   }
 }
-` : `
+` : (isEsm ? `
 export class HealthController {
   static check(req, res) {
     res.status(200).json({
@@ -30,25 +54,45 @@ export class HealthController {
     });
   }
 }
-`;
+` : `
+class HealthController {
+  static check(req, res) {
+    res.status(200).json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
+  }
+}
 
-  // Base logger utility
+module.exports = { HealthController };
+`);
+
+  // Logger utility
   ctx.files[`src/utils/logger.${ext}`] = ctx.language === 'ts' ? `
 export const logger = {
   info: (msg: string, ...args: any[]) => console.log(\`[INFO] \${msg}\`, ...args),
   error: (msg: string, ...args: any[]) => console.error(\`[ERROR] \${msg}\`, ...args),
   warn: (msg: string, ...args: any[]) => console.warn(\`[WARN] \${msg}\`, ...args),
 };
-` : `
+` : (isEsm ? `
 export const logger = {
   info: (msg, ...args) => console.log(\`[INFO] \${msg}\`, ...args),
   error: (msg, ...args) => console.error(\`[ERROR] \${msg}\`, ...args),
   warn: (msg, ...args) => console.warn(\`[WARN] \${msg}\`, ...args),
 };
-`;
+` : `
+const logger = {
+  info: (msg, ...args) => console.log(\`[INFO] \${msg}\`, ...args),
+  error: (msg, ...args) => console.error(\`[ERROR] \${msg}\`, ...args),
+  warn: (msg, ...args) => console.warn(\`[WARN] \${msg}\`, ...args),
+};
+
+module.exports = { logger };
+`);
 
   // Config file
-  ctx.files[`src/config/index.${ext}`] = `
+  ctx.files[`src/config/index.${ext}`] = isEsm ? `
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -57,6 +101,17 @@ export const config = {
   env: process.env.NODE_ENV || 'development',
   jwtSecret: process.env.JWT_SECRET || 'supersecretkey123456789'
 };
+` : `
+const dotenv = require('dotenv');
+dotenv.config();
+
+const config = {
+  port: process.env.PORT ? parseInt(process.env.PORT, 10) : 5000,
+  env: process.env.NODE_ENV || 'development',
+  jwtSecret: process.env.JWT_SECRET || 'supersecretkey123456789'
+};
+
+module.exports = { config };
 `;
 
   ctx.env['PORT'] = '5000';
@@ -80,11 +135,12 @@ registry.registerFramework('express', {
       ctx.devDependencies['@types/express'] = '^4.17.21';
       ctx.devDependencies['@types/cors'] = '^2.8.17';
     } else {
-      ctx.dependencies['nodemon'] = '^3.1.0';
+      ctx.devDependencies['nodemon'] = '^3.1.0';
     }
   },
   onGenerate(ctx) {
     const ext = getExt(ctx);
+    const isEsm = useEsm(ctx);
     setupFolders(ctx);
 
     ctx.scripts['start'] = ctx.language === 'ts' ? 'node dist/server.js' : 'node src/server.js';
@@ -99,6 +155,7 @@ import express, { Express } from 'express';
 import cors from 'cors';
 import { HealthController } from './app/controllers/health.controller.js';
 import { errorHandler } from './app/middlewares/error.middleware.js';
+${ctx.auth !== 'none' ? "import authRoutes from './app/routes/auth.routes.js';" : ''}
 
 const app: Express = express();
 
@@ -108,17 +165,18 @@ app.use(express.json());
 // Routes
 app.get('/api/health', HealthController.check);
 
-${ctx.auth !== 'none' ? "import authRoutes from './app/routes/auth.routes.js';\napp.use('/api/auth', authRoutes);" : ''}
+${ctx.auth !== 'none' ? "app.use('/api/auth', authRoutes);" : ''}
 
 // Error Handler
 app.use(errorHandler);
 
 export default app;
-` : `
+` : (isEsm ? `
 import express from 'express';
 import cors from 'cors';
 import { HealthController } from './app/controllers/health.controller.js';
 import { errorHandler } from './app/middlewares/error.middleware.js';
+${ctx.auth !== 'none' ? "import authRoutes from './app/routes/auth.routes.js';" : ''}
 
 const app = express();
 
@@ -128,16 +186,37 @@ app.use(express.json());
 // Routes
 app.get('/api/health', HealthController.check);
 
-${ctx.auth !== 'none' ? "import authRoutes from './app/routes/auth.routes.js';\napp.use('/api/auth', authRoutes);" : ''}
+${ctx.auth !== 'none' ? "app.use('/api/auth', authRoutes);" : ''}
 
 // Error Handler
 app.use(errorHandler);
 
 export default app;
-`;
+` : `
+const express = require('express');
+const cors = require('cors');
+const { HealthController } = require('./app/controllers/health.controller');
+const { errorHandler } = require('./app/middlewares/error.middleware');
+${ctx.auth !== 'none' ? "const authRoutes = require('./app/routes/auth.routes');" : ''}
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+// Routes
+app.get('/api/health', HealthController.check);
+
+${ctx.auth !== 'none' ? "app.use('/api/auth', authRoutes);" : ''}
+
+// Error Handler
+app.use(errorHandler);
+
+module.exports = app;
+`);
 
     // src/server.ts
-    ctx.files[`src/server.${ext}`] = `
+    ctx.files[`src/server.${ext}`] = isEsm ? `
 import app from './app.js';
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
@@ -150,6 +229,25 @@ const start = async () => {
       logger.info(\`🚀 Server running on http://localhost:\${config.port} in \${config.env} mode\`);
     });
   } catch (err: any) {
+    logger.error(\`Failed to start server: \${err.message}\`);
+    process.exit(1);
+  }
+};
+
+start();
+` : `
+const app = require('./app');
+const { config } = require('./config/index');
+const { logger } = require('./utils/logger');
+const { connectDatabase } = require('./database/index');
+
+const start = async () => {
+  try {
+    await connectDatabase();
+    app.listen(config.port, () => {
+      logger.info(\`🚀 Server running on http://localhost:\${config.port} in \${config.env} mode\`);
+    });
+  } catch (err) {
     logger.error(\`Failed to start server: \${err.message}\`);
     process.exit(1);
   }
@@ -169,7 +267,18 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ): void => {
-  logger.error(\`Express Error Handler: \${err.message}\`);
+  logger.error(\`Express Error: \${err.message}\`);
+  const status = err.status || 500;
+  res.status(status).json({
+    status: 'error',
+    message: err.message || 'Internal Server Error'
+  });
+};
+` : (isEsm ? `
+import { logger } from '../../utils/logger.js';
+
+export const errorHandler = (err, req, res, next) => {
+  logger.error(\`Express Error: \${err.message}\`);
   const status = err.status || 500;
   res.status(status).json({
     status: 'error',
@@ -177,17 +286,19 @@ export const errorHandler = (
   });
 };
 ` : `
-import { logger } from '../../utils/logger.js';
+const { logger } = require('../../utils/logger');
 
-export const errorHandler = (err, req, res, next) => {
-  logger.error(\`Express Error Handler: \${err.message}\`);
+const errorHandler = (err, req, res, next) => {
+  logger.error(\`Express Error: \${err.message}\`);
   const status = err.status || 500;
   res.status(status).json({
     status: 'error',
     message: err.message || 'Internal Server Error'
   });
 };
-`;
+
+module.exports = { errorHandler };
+`);
   }
 });
 
@@ -199,11 +310,12 @@ registry.registerFramework('fastify', {
     ctx.dependencies['@fastify/cors'] = '^9.0.1';
     ctx.dependencies['dotenv'] = '^16.4.5';
     if (ctx.language === 'js') {
-      ctx.dependencies['nodemon'] = '^3.1.0';
+      ctx.devDependencies['nodemon'] = '^3.1.0';
     }
   },
   onGenerate(ctx) {
     const ext = getExt(ctx);
+    const isEsm = useEsm(ctx);
     setupFolders(ctx);
 
     ctx.scripts['start'] = ctx.language === 'ts' ? 'node dist/server.js' : 'node src/server.js';
@@ -243,7 +355,7 @@ app.setErrorHandler((error, request, reply) => {
 });
 
 export default app;
-` : `
+` : (isEsm ? `
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { logger } from './utils/logger.js';
@@ -273,10 +385,40 @@ app.setErrorHandler((error, request, reply) => {
 });
 
 export default app;
-`;
+` : `
+const Fastify = require('fastify');
+const cors = require('@fastify/cors');
+const { logger } = require('./utils/logger');
+
+const app = Fastify({ logger: false });
+
+app.register(cors);
+
+// Health check
+app.get('/api/health', async () => {
+  return {
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  };
+});
+
+${ctx.auth !== 'none' ? "const authRoutes = require('./app/routes/auth.routes');\napp.register(authRoutes, { prefix: '/api/auth' });" : ''}
+
+// Error Handler
+app.setErrorHandler((error, request, reply) => {
+  logger.error(\`Fastify Error: \${error.message}\`);
+  reply.status(error.statusCode || 500).send({
+    status: 'error',
+    message: error.message || 'Internal Server Error'
+  });
+});
+
+module.exports = app;
+`);
 
     // src/server.ts
-    ctx.files[`src/server.${ext}`] = `
+    ctx.files[`src/server.${ext}`] = isEsm ? `
 import app from './app.js';
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
@@ -294,11 +436,29 @@ const start = async () => {
 };
 
 start();
+` : `
+const app = require('./app');
+const { config } = require('./config/index');
+const { logger } = require('./utils/logger');
+const { connectDatabase } = require('./database/index');
+
+const start = async () => {
+  try {
+    await connectDatabase();
+    await app.listen({ port: config.port, host: '0.0.0.0' });
+    logger.info(\`🚀 Server running on http://localhost:\${config.port} in \${config.env} mode\`);
+  } catch (err) {
+    logger.error(\`Failed to start Fastify server: \${err.message}\`);
+    process.exit(1);
+  }
+};
+
+start();
 `;
   }
 });
 
-// Hono Plugin
+// Hono Plugin (Always ESM since Hono is modern ESM native)
 registry.registerFramework('hono', {
   name: 'hono',
   onInstall(ctx) {
@@ -306,7 +466,7 @@ registry.registerFramework('hono', {
     ctx.dependencies['@hono/node-server'] = '^1.11.2';
     ctx.dependencies['dotenv'] = '^16.4.5';
     if (ctx.language === 'js') {
-      ctx.dependencies['nodemon'] = '^3.1.0';
+      ctx.devDependencies['nodemon'] = '^3.1.0';
     }
   },
   onGenerate(ctx) {
@@ -319,36 +479,8 @@ registry.registerFramework('hono', {
       ctx.scripts['build'] = 'tsc';
     }
 
-    // src/app.ts
-    ctx.files[`src/app.${ext}`] = ctx.language === 'ts' ? `
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import { logger } from './utils/logger.js';
-
-const app = new Hono();
-
-app.use('*', cors());
-
-app.get('/api/health', (c) => {
-  return c.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
-
-${ctx.auth !== 'none' ? "import authRoutes from './app/routes/auth.routes.js';\napp.route('/api/auth', authRoutes);" : ''}
-
-app.onError((err, c) => {
-  logger.error(\`Hono Error: \${err.message}\`);
-  return c.json({
-    status: 'error',
-    message: err.message || 'Internal Server Error'
-  }, 500);
-});
-
-export default app;
-` : `
+    // src/app.ts (Hono codebase stays in ESM regardless of config since Hono uses standard ESM loaders)
+    ctx.files[`src/app.${ext}`] = `
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from './utils/logger.js';
@@ -410,18 +542,28 @@ start();
 // 2. ORM & DATABASE PLUGINS
 // ==========================================
 
-// None Database / None ORM plugin (creates simple connection mocks)
+// None Database / None ORM
 registry.registerDatabase('none', {
   name: 'none-db',
   onGenerate(ctx) {
     const ext = getExt(ctx);
-    ctx.files[`src/database/index.${ext}`] = `
+    const isEsm = useEsm(ctx);
+    ctx.files[`src/database/index.${ext}`] = isEsm ? `
 import { logger } from '../utils/logger.js';
 
 export const connectDatabase = async () => {
   logger.info('No database connection configured.');
   return Promise.resolve();
 };
+` : `
+const { logger } = require('../utils/logger');
+
+const connectDatabase = async () => {
+  logger.info('No database connection configured.');
+  return Promise.resolve();
+};
+
+module.exports = { connectDatabase };
 `;
   }
 });
@@ -431,17 +573,13 @@ registry.registerORM('mongoose', {
   name: 'mongoose',
   onInstall(ctx) {
     ctx.dependencies['mongoose'] = '^8.4.1';
-    if (ctx.language === 'ts') {
-      ctx.devDependencies['@types/node'] = '^22.0.0';
-    }
   },
   onGenerate(ctx) {
     const ext = getExt(ctx);
-    ctx.env['DATABASE_URL'] = ctx.database === 'mongodb' 
-      ? 'mongodb://localhost:27017/tcx_backend' 
-      : 'mongodb://localhost:27017/tcx_backend';
+    const isEsm = useEsm(ctx);
+    ctx.env['DATABASE_URL'] = 'mongodb://localhost:27017/tcx_backend';
 
-    ctx.files[`src/database/index.${ext}`] = `
+    ctx.files[`src/database/index.${ext}`] = isEsm ? `
 import mongoose from 'mongoose';
 import { logger } from '../utils/logger.js';
 
@@ -455,6 +593,22 @@ export const connectDatabase = async () => {
     throw error;
   }
 };
+` : `
+const mongoose = require('mongoose');
+const { logger } = require('../utils/logger');
+
+const connectDatabase = async () => {
+  const url = process.env.DATABASE_URL || 'mongodb://localhost:27017/tcx_backend';
+  try {
+    await mongoose.connect(url);
+    logger.info('🔌 Connected to MongoDB database using Mongoose');
+  } catch (error) {
+    logger.error(\`Database connection error: \${error.message}\`);
+    throw error;
+  }
+};
+
+module.exports = { connectDatabase };
 `;
   }
 });
@@ -468,6 +622,7 @@ registry.registerORM('prisma', {
   },
   onGenerate(ctx) {
     const ext = getExt(ctx);
+    const isEsm = useEsm(ctx);
     let provider = 'postgresql';
     let urlValue = 'postgresql://johndoe:randompassword@localhost:5432/mydb?schema=public';
 
@@ -481,7 +636,7 @@ registry.registerORM('prisma', {
 
     ctx.env['DATABASE_URL'] = urlValue;
 
-    ctx.files[`src/database/index.${ext}`] = `
+    ctx.files[`src/database/index.${ext}`] = isEsm ? `
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger.js';
 
@@ -496,6 +651,23 @@ export const connectDatabase = async () => {
     throw error;
   }
 };
+` : `
+const { PrismaClient } = require('@prisma/client');
+const { logger } = require('../utils/logger');
+
+const prisma = new PrismaClient();
+
+const connectDatabase = async () => {
+  try {
+    await prisma.$connect();
+    logger.info('🔌 Connected to database via Prisma Client');
+  } catch (error) {
+    logger.error(\`Failed to connect database via Prisma Client: \${error.message}\`);
+    throw error;
+  }
+};
+
+module.exports = { prisma, connectDatabase };
 `;
 
     // Write schema.prisma
@@ -532,16 +704,21 @@ registry.registerORM('drizzle', {
     ctx.devDependencies['drizzle-kit'] = '^0.22.7';
     if (ctx.database === 'postgres') {
       ctx.dependencies['pg'] = '^8.11.5';
-      ctx.devDependencies['@types/pg'] = '^8.11.6';
+      if (ctx.language === 'ts') {
+        ctx.devDependencies['@types/pg'] = '^8.11.6';
+      }
     } else if (ctx.database === 'mysql') {
       ctx.dependencies['mysql2'] = '^3.9.8';
     } else if (ctx.database === 'sqlite') {
       ctx.dependencies['better-sqlite3'] = '^11.0.0';
-      ctx.devDependencies['@types/better-sqlite3'] = '^7.6.10';
+      if (ctx.language === 'ts') {
+        ctx.devDependencies['@types/better-sqlite3'] = '^7.6.10';
+      }
     }
   },
   onGenerate(ctx) {
     const ext = getExt(ctx);
+    const isEsm = useEsm(ctx);
     let dbType = 'postgresql';
     let connString = 'postgresql://johndoe:randompassword@localhost:5432/mydb';
 
@@ -555,7 +732,7 @@ registry.registerORM('drizzle', {
 
     ctx.env['DATABASE_URL'] = connString;
 
-    // Drizzle Kit Config
+    // Drizzle kit configuration
     ctx.files['drizzle.config.ts'] = `
 import { defineConfig } from 'drizzle-kit';
 
@@ -570,7 +747,7 @@ export default defineConfig({
 `;
 
     // database/schema.ts
-    ctx.files[`src/database/schema.${ext}`] = `
+    ctx.files[`src/database/schema.${ext}`] = isEsm ? `
 import { pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
@@ -580,12 +757,24 @@ export const users = pgTable('users', {
   password: text('password').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull()
 });
+` : `
+const { pgTable, serial, text, timestamp } = require('drizzle-orm/pg-core');
+
+const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  password: text('password').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+module.exports = { users };
 `;
 
     // database/index.ts
-    let dbImportsAndInst = '';
+    let dbImports = '';
     if (ctx.database === 'postgres') {
-      dbImportsAndInst = `
+      dbImports = isEsm ? `
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import * as schema from './schema.js';
@@ -594,36 +783,75 @@ const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL || '${connString}',
 });
 export const db = drizzle(pool, { schema });
+` : `
+const { drizzle } = require('drizzle-orm/node-postgres');
+const pg = require('pg');
+const schema = require('./schema');
+
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL || '${connString}',
+});
+const db = drizzle(pool, { schema });
 `;
     } else if (ctx.database === 'mysql') {
-      dbImportsAndInst = `
+      dbImports = isEsm ? `
 import { drizzle } from 'drizzle-orm/mysql2';
 import mysql from 'mysql2/promise';
 import * as schema from './schema.js';
 
 const connection = await mysql.createConnection(process.env.DATABASE_URL || '${connString}');
 export const db = drizzle(connection, { schema });
+` : `
+const { drizzle } = require('drizzle-orm/mysql2');
+const mysql = require('mysql2/promise');
+const schema = require('./schema');
+
+// Top level await is restricted in CJS, connection is initialized inside connectDatabase
+let db;
 `;
     } else {
       // sqlite
-      dbImportsAndInst = `
+      dbImports = isEsm ? `
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
 import * as schema from './schema.js';
 
 const sqlite = new Database(process.env.DATABASE_URL || 'dev.db');
 export const db = drizzle(sqlite, { schema });
+` : `
+const { drizzle } = require('drizzle-orm/better-sqlite3');
+const Database = require('better-sqlite3');
+const schema = require('./schema');
+
+const sqlite = new Database(process.env.DATABASE_URL || 'dev.db');
+const db = drizzle(sqlite, { schema });
 `;
     }
 
-    ctx.files[`src/database/index.${ext}`] = `
-${dbImportsAndInst}
+    ctx.files[`src/database/index.${ext}`] = isEsm ? `
+${dbImports}
 import { logger } from '../utils/logger.js';
 
 export const connectDatabase = async () => {
   logger.info('🔌 Connected to database via Drizzle ORM');
   return Promise.resolve();
 };
+` : `
+${dbImports}
+const { logger } = require('../utils/logger');
+
+const connectDatabase = async () => {
+  ${ctx.database === 'mysql' ? `
+  const mysql = require('mysql2/promise');
+  const schema = require('./schema');
+  const connection = await mysql.createConnection(process.env.DATABASE_URL || '${connString}');
+  module.exports.db = drizzle(connection, { schema });
+  ` : ''}
+  logger.info('🔌 Connected to database via Drizzle ORM');
+  return Promise.resolve();
+};
+
+module.exports = { connectDatabase${ctx.database !== 'mysql' ? ', db' : ''} };
 `;
 
     ctx.scripts['db:generate'] = 'drizzle-kit generate';
@@ -631,8 +859,8 @@ export const connectDatabase = async () => {
   }
 });
 
-// PostgreSQL / MySQL / SQLite plugins (without ORM)
-const registerNativeDb = (name: string, dep: string, connectCode: string, typesDep?: string) => {
+// PostgreSQL / MySQL / SQLite Native Plugins (without ORM)
+const registerNativeDb = (name: string, dep: string, connectCodeEsm: string, connectCodeCjs: string, typesDep?: string) => {
   registry.registerDatabase(name, {
     name: `${name}-db`,
     onInstall(ctx) {
@@ -645,8 +873,9 @@ const registerNativeDb = (name: string, dep: string, connectCode: string, typesD
     },
     onGenerate(ctx) {
       const ext = getExt(ctx);
+      const isEsm = useEsm(ctx);
       if (ctx.orm === 'none') {
-        ctx.files[`src/database/index.${ext}`] = connectCode;
+        ctx.files[`src/database/index.${ext}`] = isEsm ? connectCodeEsm : connectCodeCjs;
       }
     }
   });
@@ -669,6 +898,25 @@ export const connectDatabase = async () => {
     throw error;
   }
 };
+`, `
+const pg = require('pg');
+const { logger } = require('../utils/logger');
+
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/mydb'
+});
+
+const connectDatabase = async () => {
+  try {
+    await pool.query('SELECT NOW()');
+    logger.info('🔌 Connected to PostgreSQL pool successfully');
+  } catch (error) {
+    logger.error(\`Failed to connect to PostgreSQL: \${error.message}\`);
+    throw error;
+  }
+};
+
+module.exports = { pool, connectDatabase };
 `, '@types/pg');
 
 registerNativeDb('mysql', 'mysql2', `
@@ -686,6 +934,23 @@ export const connectDatabase = async () => {
     throw error;
   }
 };
+`, `
+const mysql = require('mysql2/promise');
+const { logger } = require('../utils/logger');
+
+let connection;
+
+const connectDatabase = async () => {
+  try {
+    module.exports.connection = await mysql.createConnection(process.env.DATABASE_URL || 'mysql://localhost:3306/mydb');
+    logger.info('🔌 Connected to MySQL server successfully');
+  } catch (error) {
+    logger.error(\`Failed to connect to MySQL: \${error.message}\`);
+    throw error;
+  }
+};
+
+module.exports = { connectDatabase };
 `);
 
 registerNativeDb('sqlite', 'better-sqlite3', `
@@ -703,6 +968,23 @@ export const connectDatabase = async () => {
     throw error;
   }
 };
+`, `
+const Database = require('better-sqlite3');
+const { logger } = require('../utils/logger');
+
+let db;
+
+const connectDatabase = async () => {
+  try {
+    module.exports.db = new Database(process.env.DATABASE_URL || 'dev.db');
+    logger.info('🔌 Connected to SQLite database file successfully');
+  } catch (error) {
+    logger.error(\`Failed to connect to SQLite: \${error.message}\`);
+    throw error;
+  }
+};
+
+module.exports = { connectDatabase };
 `, '@types/better-sqlite3');
 
 registerNativeDb('mongodb', 'mongodb', `
@@ -723,6 +1005,26 @@ export const connectDatabase = async () => {
     throw error;
   }
 };
+`, `
+const { MongoClient } = require('mongodb');
+const { logger } = require('../utils/logger');
+
+const url = process.env.DATABASE_URL || 'mongodb://localhost:27017';
+const client = new MongoClient(url);
+let db;
+
+const connectDatabase = async () => {
+  try {
+    await client.connect();
+    module.exports.db = client.db('tcx_backend');
+    logger.info('🔌 Connected to MongoDB client successfully');
+  } catch (error) {
+    logger.error(\`Failed to connect to MongoDB: \${error.message}\`);
+    throw error;
+  }
+};
+
+module.exports = { client, connectDatabase };
 `);
 
 // ==========================================
@@ -742,6 +1044,7 @@ registry.registerPlugin('auth-jwt', {
   },
   onGenerate(ctx) {
     const ext = getExt(ctx);
+    const isEsm = useEsm(ctx);
 
     // Auth Middleware
     ctx.files[`src/app/middlewares/auth.middleware.${ext}`] = ctx.language === 'ts' ? `
@@ -772,7 +1075,7 @@ export const protect = (req: AuthRequest, res: Response, next: NextFunction): vo
     res.status(401).json({ message: 'Not authorized, invalid token' });
   }
 };
-` : `
+` : (isEsm ? `
 import jwt from 'jsonwebtoken';
 import { config } from '../../config/index.js';
 
@@ -794,7 +1097,31 @@ export const protect = (req, res, next) => {
     return res.status(401).json({ message: 'Not authorized, invalid token' });
   }
 };
-`;
+` : `
+const jwt = require('jsonwebtoken');
+const { config } = require('../../config/index');
+
+const protect = (req, res, next) => {
+  let token;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  if (!token) {
+    return res.status(401).json({ message: 'Not authorized, token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: 'Not authorized, invalid token' });
+  }
+};
+
+module.exports = { protect };
+`);
 
     // Auth controller
     ctx.files[`src/app/controllers/auth.controller.${ext}`] = ctx.language === 'ts' ? `
@@ -808,7 +1135,6 @@ export class AuthController {
     const { name, email, password } = req.body;
     try {
       const hashedPassword = await bcrypt.hash(password, 10);
-      // Mock db register logic
       const token = jwt.sign({ name, email }, config.jwtSecret, { expiresIn: '30d' });
       res.status(201).json({ name, email, token });
     } catch (err: any) {
@@ -819,7 +1145,6 @@ export class AuthController {
   public static async login(req: Request, res: Response): Promise<void> {
     const { email, password } = req.body;
     try {
-      // Mock db login validation logic
       const token = jwt.sign({ email }, config.jwtSecret, { expiresIn: '30d' });
       res.status(200).json({ email, token });
     } catch (err: any) {
@@ -827,7 +1152,7 @@ export class AuthController {
     }
   }
 }
-` : `
+` : (isEsm ? `
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { config } from '../../config/index.js';
@@ -854,10 +1179,39 @@ export class AuthController {
     }
   }
 }
-`;
+` : `
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { config } = require('../../config/index');
+
+class AuthController {
+  static async register(req, res) {
+    const { name, email, password } = req.body;
+    try {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const token = jwt.sign({ name, email }, config.jwtSecret, { expiresIn: '30d' });
+      res.status(201).json({ name, email, token });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  }
+
+  static async login(req, res) {
+    const { email, password } = req.body;
+    try {
+      const token = jwt.sign({ email }, config.jwtSecret, { expiresIn: '30d' });
+      res.status(200).json({ email, token });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  }
+}
+
+module.exports = { AuthController };
+`);
 
     // Auth Routes
-    ctx.files[`src/app/routes/auth.routes.${ext}`] = `
+    ctx.files[`src/app/routes/auth.routes.${ext}`] = isEsm ? `
 import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller.js';
 import { protect } from '../middlewares/auth.middleware.js';
@@ -871,11 +1225,25 @@ router.get('/me', protect, (req: any, res: any) => {
 });
 
 export default router;
+` : `
+const { Router } = require('express');
+const { AuthController } = require('../controllers/auth.controller');
+const { protect } = require('../middlewares/auth.middleware');
+
+const router = Router();
+
+router.post('/register', AuthController.register);
+router.post('/login', AuthController.login);
+router.get('/me', protect, (req, res) => {
+  res.json({ user: req.user });
+});
+
+module.exports = router;
 `;
   }
 });
 
-// Better Auth Plugin
+// Better Auth Plugin (ESM only)
 registry.registerPlugin('auth-better-auth', {
   name: 'better-auth',
   onInstall(ctx) {
@@ -906,6 +1274,7 @@ registry.registerPlugin('validation-zod', {
   },
   onGenerate(ctx) {
     const ext = getExt(ctx);
+    const isEsm = useEsm(ctx);
 
     ctx.files[`src/app/middlewares/validation.middleware.${ext}`] = ctx.language === 'ts' ? `
 import { Request, Response, NextFunction } from 'express';
@@ -925,7 +1294,7 @@ export const validateBody = (schema: ZodSchema) => {
     }
   };
 };
-` : `
+` : (isEsm ? `
 export const validateBody = (schema) => {
   return (req, res, next) => {
     try {
@@ -940,7 +1309,24 @@ export const validateBody = (schema) => {
     }
   };
 };
-`;
+` : `
+const validateBody = (schema) => {
+  return (req, res, next) => {
+    try {
+      schema.parse(req.body);
+      next();
+    } catch (error) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Validation failed',
+        errors: error.errors
+      });
+    }
+  };
+};
+
+module.exports = { validateBody };
+`);
   }
 });
 
@@ -948,6 +1334,7 @@ export const validateBody = (schema) => {
 registry.registerPlugin('docker', {
   name: 'docker',
   onGenerate(ctx) {
+    const isEsm = useEsm(ctx);
     ctx.files['Dockerfile'] = `
 FROM node:22-alpine AS builder
 WORKDIR /app
@@ -989,8 +1376,9 @@ registry.registerPlugin('swagger', {
   },
   onGenerate(ctx) {
     const ext = getExt(ctx);
+    const isEsm = useEsm(ctx);
     if (ctx.framework === 'express') {
-      ctx.files[`src/config/swagger.${ext}`] = `
+      ctx.files[`src/config/swagger.${ext}`] = isEsm ? `
 export const swaggerDocument = {
   openapi: '3.0.0',
   info: {
@@ -1016,8 +1404,35 @@ export const swaggerDocument = {
     }
   }
 };
+` : `
+const swaggerDocument = {
+  openapi: '3.0.0',
+  info: {
+    title: '${ctx.projectName} API Docs',
+    version: '1.0.0',
+    description: 'Auto-generated API swagger documentation'
+  },
+  servers: [
+    {
+      url: 'http://localhost:5000'
+    }
+  ],
+  paths: {
+    '/api/health': {
+      get: {
+        summary: 'Health Check',
+        responses: {
+          '200': {
+            description: 'Success response'
+          }
+        }
+      }
+    }
+  }
+};
+
+module.exports = { swaggerDocument };
 `;
-      // Mount inside app.ts or similar
     }
   }
 });

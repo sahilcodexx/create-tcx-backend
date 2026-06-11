@@ -4,6 +4,7 @@ export interface ProjectContext {
   packageManager: 'npm' | 'pnpm' | 'yarn' | 'bun';
   framework: 'express' | 'fastify' | 'hono';
   language: 'ts' | 'js';
+  moduleSystem: 'esm' | 'cjs';
   database: 'postgres' | 'mongodb' | 'mysql' | 'sqlite' | 'none';
   orm: 'prisma' | 'drizzle' | 'mongoose' | 'none';
   auth: 'jwt' | 'better-auth' | 'none';
