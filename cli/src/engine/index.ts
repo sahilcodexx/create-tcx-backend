@@ -26,8 +26,8 @@ export async function generateProject(ctx: ProjectContext): Promise<void> {
       ctx.files['tsconfig.json'] = JSON.stringify({
         compilerOptions: {
           target: 'ES2022',
-          module: isEsm ? 'NodeNext' : 'CommonJS',
-          moduleResolution: isEsm ? 'NodeNext' : 'Node',
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
           esModuleInterop: true,
           strict: true,
           skipLibCheck: true,
