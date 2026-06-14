@@ -1,4 +1,5 @@
 import { IconBrandGithub, IconCopy, IconDownload } from "@tabler/icons-react";
+import { motion } from "motion/react";
 
 export default function Home() {
   return (
