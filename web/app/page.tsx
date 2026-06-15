@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { IconBrandGithub, IconCheck, IconCopy, IconDownload } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -131,7 +132,7 @@ export default function Home() {
           transition={{ delay: 2.2, duration: 0.8 }}
           className="flex items-center justify-between font-mono pt-4"
         >
-          [Docs]
+          [<Link href="/docs" className="hover:underline">Docs</Link>]
           <div className="flex gap-3">[github] [npm]</div>
         </motion.div>
 
