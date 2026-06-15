@@ -84,7 +84,7 @@ function SectionHeading({ id, children }: { id: string; children: React.ReactNod
   return (
     <h2
       id={id}
-      className="text-2xl font-semibold text-white/90 mt-16 mb-6 scroll-mt-24 flex items-center gap-2 group"
+      className="text-xl font-semibold text-white/90 mt-8 mb-3 scroll-mt-20 flex items-center gap-2 group"
     >
       {children}
       <a
@@ -257,7 +257,7 @@ export default function DocsPage() {
         />
       )}
 
-      <div className="max-w-6xl mx-auto flex px-6 py-10 gap-12">
+      <div className="max-w-6xl mx-auto flex px-6 py-6 gap-8">
         {/* ── Desktop sidebar ── */}
         <div className="hidden lg:block sticky top-24 self-start h-fit">
           <Sidebar />
@@ -276,13 +276,13 @@ export default function DocsPage() {
         <main ref={contentRef} className="flex-1 min-w-0 max-w-3xl">
 
           {/* Page title */}
-          <div className="mb-12 pb-8 border-b border-white/[0.06]">
+          <div className="mb-6 pb-5 border-b border-white/[0.06]">
             <div className="flex items-center gap-2 mb-4">
               <Badge color="amber">docs</Badge>
               <Badge color="green">v1.0.0</Badge>
               <Badge>Node.js ≥22</Badge>
             </div>
-            <h1 className="text-4xl font-bold text-white/95 mb-4 leading-tight">
+            <h1 className="text-3xl font-bold text-white/95 mb-3 leading-tight">
               create-tcx-backend
             </h1>
             <p className="text-zinc-400 text-lg leading-relaxed">

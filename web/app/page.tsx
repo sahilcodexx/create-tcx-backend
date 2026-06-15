@@ -132,7 +132,7 @@ export default function Home() {
           transition={{ delay: 2.2, duration: 0.8 }}
           className="flex items-center justify-between font-mono pt-4"
         >
-          [<Link href="/docs" className="hover:underline">Docs</Link>]
+          <Link href="/docs">[Docs]</Link>
           <div className="flex gap-3">[github] [npm]</div>
         </motion.div>
 
