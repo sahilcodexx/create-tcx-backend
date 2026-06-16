@@ -14,12 +14,7 @@ import {
   IconDatabase,
   IconShield,
   IconSettings,
-  IconFolderOpen,
   IconApi,
-  IconPackage,
-  IconChevronRight,
-  IconMenu2,
-  IconX,
   IconAlertTriangle,
   IconInfoCircle,
   IconBolt,
@@ -434,54 +429,11 @@ function Layer({ name, desc }: { name: string; desc: string }) {
   );
 }
 
-/* ─── Sidebar ─────────────────────────────────────────────────────────────── */
-function Sidebar({ active, scrollTo }: { active: string; scrollTo: (id: string) => void }) {
-  return (
-    <aside className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-3 py-4 border-b border-zinc-800/40 mb-4">
-        <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-zinc-800 border border-zinc-700/50">
-          <IconBolt size={13} className="text-zinc-400" />
-        </div>
-        <span className="text-sm font-medium text-zinc-200">create-tcx-backend</span>
-      </div>
-      {NAV.map((group) => (
-        <div key={group.group} className="mb-5">
-          <p className="text-[11px] font-semibold tracking-widest text-zinc-600 mb-1.5 px-3 uppercase">{group.group}</p>
-          <div className="flex flex-col gap-0.5">
-            {group.items.map(({ id, label, icon }) => (
-              <button
-                key={id}
-                onClick={() => scrollTo(id)}
-                className={`group flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-left w-full transition-all ${
-                  active === id
-                    ? "bg-zinc-800/70 text-zinc-100"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30"
-                }`}
-              >
-                <span className={`shrink-0 ${active === id ? "text-zinc-400" : "text-zinc-600 group-hover:text-zinc-500"}`}>{icon}</span>
-                {label}
-                {active === id && <span className="ml-auto w-1 h-4 rounded-full bg-zinc-500" />}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-      <div className="mt-auto pt-4 border-t border-zinc-800/40 flex flex-col gap-0.5">
-        <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30 transition-colors">
-          <IconBrandGithub size={14} className="text-zinc-600" />GitHub
-        </a>
-        <a href="https://npmjs.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30 transition-colors">
-          <IconBrandNpm size={14} className="text-zinc-600" />npm
-        </a>
-      </div>
-    </aside>
-  );
-}
+
 
 /* ─── Page ────────────────────────────────────────────────────────────────── */
 export default function DocsPage() {
   const [active, setActive] = useState("introduction");
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
 
   // Track scroll progress for the circular indicator
@@ -517,44 +469,40 @@ export default function DocsPage() {
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
     window.history.replaceState(null, "", `#${id}`);
-    setMobileOpen(false);
   };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-300">
-      {/* Mobile header */}
-      <header className="sticky top-0 z-40 border-b border-zinc-800/50 bg-zinc-950/95 backdrop-blur-sm lg:hidden">
-        <div className="flex items-center justify-between px-4 h-12">
-          <button onClick={() => setMobileOpen(!mobileOpen)} className="text-zinc-500 hover:text-zinc-300">
-            {mobileOpen ? <IconX size={18} /> : <IconMenu2 size={18} />}
-          </button>
-          <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 transition-colors text-sm font-mono">
-              <IconArrowLeft size={13} />
-              home
+      {/* Top navbar */}
+      <header className="sticky top-0 z-40 border-b border-zinc-800/50 bg-zinc-950/90 backdrop-blur-md">
+        <div className="max-w-3xl mx-auto flex items-center justify-between px-6 h-14">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-200 transition-colors text-[13px] font-mono">
+              <IconArrowLeft size={14} />
+              back
             </Link>
-            <Badge variant="outline">v1.0.0</Badge>
+            <span className="w-px h-4 bg-zinc-800" />
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-5 h-5 rounded-md bg-zinc-800 border border-zinc-700/50">
+                <IconBolt size={11} className="text-zinc-400" />
+              </div>
+              <span className="text-[13px] font-medium text-zinc-200">create-tcx-backend</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center w-8 h-8 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors">
+              <IconBrandGithub size={16} />
+            </a>
+            <a href="https://npmjs.com" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center w-8 h-8 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors">
+              <IconBrandNpm size={16} />
+            </a>
           </div>
         </div>
       </header>
 
-      {/* Mobile overlay */}
-      {mobileOpen && <div className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setMobileOpen(false)} />}
-
-      {/* Mobile sidebar */}
-      <div className={`fixed top-12 left-0 bottom-0 z-30 w-60 bg-zinc-950 border-r border-zinc-800/50 overflow-y-auto transition-transform duration-200 lg:hidden ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <Sidebar active={active} scrollTo={scrollTo} />
-      </div>
-
-      {/* Desktop layout */}
-      <div className="max-w-7xl mx-auto flex px-4 lg:px-6">
-        {/* Left sidebar */}
-        <div className="hidden lg:flex flex-col w-56 shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-zinc-800/40 py-4 pr-4">
-          <Sidebar active={active} scrollTo={scrollTo} />
-        </div>
-
-        {/* Content */}
-        <main className="flex-1 min-w-0 py-8 lg:py-14 px-4 lg:px-10 xl:px-14 max-w-3xl">
+      {/* Content */}
+      <div className="max-w-3xl mx-auto px-6">
+        <main className="py-10 pb-24">
 
           {/* Introduction */}
           <section id="introduction">
