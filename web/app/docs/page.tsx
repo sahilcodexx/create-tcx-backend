@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { motion, AnimatePresence } from "motion/react";
+
 import {
   IconArrowLeft,
   IconBrandGithub,
@@ -59,6 +61,215 @@ const NAV = [
 ];
 
 const ALL_IDS = NAV.flatMap((g) => g.items.map((i) => i.id));
+const ALL_LABELS: Record<string, string> = {};
+NAV.forEach((g) => g.items.forEach((i) => { ALL_LABELS[i.id] = i.label; }));
+
+/* ─── Floating Nav Pill ────────────────────────────────────────────────────── */
+function FloatingNavPill({
+  active,
+  progress,
+  scrollTo,
+}: {
+  active: string;
+  progress: number;
+  scrollTo: (id: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const pillRef = useRef<HTMLElement>(null);
+  const circumference = 2 * Math.PI * 16; // r=16
+  const offset = circumference - progress * circumference;
+
+  // Close on outside click
+  useEffect(() => {
+    if (!expanded) return;
+    const handleClick = (e: MouseEvent) => {
+      if (pillRef.current && !pillRef.current.contains(e.target as Node)) {
+        setExpanded(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [expanded]);
+
+  // Close on scroll
+  useEffect(() => {
+    if (!expanded) return;
+    const close = () => setExpanded(false);
+    window.addEventListener("scroll", close, { passive: true });
+    return () => window.removeEventListener("scroll", close);
+  }, [expanded]);
+
+  const allItems = NAV.flatMap((g) => g.items);
+
+  return (
+    <motion.nav
+      ref={pillRef}
+      layout
+      onClick={() => !expanded && setExpanded(true)}
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 cursor-pointer z-[100] max-w-[calc(100vw-2rem)] sm:max-w-none"
+      style={{
+        background: "#09090B",
+        boxShadow:
+          "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08)",
+        overflow: "hidden",
+      }}
+      animate={{
+        width: expanded ? 320 : 280,
+        height: expanded ? "auto" : 48,
+        borderRadius: expanded ? 20 : 30,
+      }}
+      transition={{ type: "spring", damping: 28, stiffness: 350 }}
+    >
+      <AnimatePresence mode="wait">
+        {expanded ? (
+          /* ── Expanded state: full section list ── */
+          <motion.div
+            key="expanded"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="p-2"
+          >
+            {NAV.map((group) => (
+              <div key={group.group} className="mb-1 last:mb-0">
+                <p className="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-widest text-zinc-600 uppercase">
+                  {group.group}
+                </p>
+                {group.items.map(({ id, label, icon }) => (
+                  <button
+                    key={id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      scrollTo(id);
+                      setExpanded(false);
+                    }}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-[13px] font-medium transition-all ${
+                      active === id
+                        ? "bg-white/10 text-white"
+                        : "text-zinc-500 hover:text-zinc-200 hover:bg-white/5"
+                    }`}
+                  >
+                    <span
+                      className={`shrink-0 ${
+                        active === id ? "text-white" : "text-zinc-600"
+                      }`}
+                    >
+                      {icon}
+                    </span>
+                    {label}
+                    {active === id && (
+                      <span className="ml-auto size-1.5 rounded-full bg-white" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            ))}
+
+            {/* Collapse bar */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded(false);
+              }}
+              className="flex items-center justify-center w-full mt-1 py-2 rounded-xl text-zinc-600 hover:text-zinc-300 hover:bg-white/5 transition-colors"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            </button>
+          </motion.div>
+        ) : (
+          /* ── Collapsed state: single pill ── */
+          <motion.div
+            key="collapsed"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="relative w-full flex items-center justify-center"
+            style={{ height: 48 }}
+          >
+            <div
+              className="flex w-full items-center justify-between gap-3 px-4"
+              style={{ height: "auto" }}
+            >
+              <div className="flex flex-1 items-center gap-3 overflow-hidden justify-center min-w-0">
+                {/* Pulsing dot */}
+                <div className="relative size-2 shrink-0">
+                  <span className="absolute inset-0 rounded-full bg-white animate-ping opacity-40" />
+                  <span className="relative block size-2 rounded-full bg-white" />
+                </div>
+
+                {/* Section name with vertical slide */}
+                <div className="relative h-5 flex-1 min-w-0 overflow-hidden">
+                  <AnimatePresence mode="popLayout">
+                    <motion.div
+                      key={active}
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: -20, opacity: 0 }}
+                      transition={{
+                        duration: 0.3,
+                        ease: [0.25, 0.1, 0.25, 1],
+                      }}
+                      className="flex h-5 items-center text-[13px] font-medium text-white min-w-0"
+                    >
+                      <span className="truncate block w-full">
+                        {ALL_LABELS[active] ?? active}
+                      </span>
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </div>
+
+              {/* Circular progress ring */}
+              <div className="relative size-7 shrink-0 mr-1">
+                <svg
+                  className="size-full -rotate-90"
+                  viewBox="0 0 36 36"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="16"
+                    fill="none"
+                    className="stroke-current text-white/20"
+                    strokeWidth="3.5"
+                  />
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="16"
+                    fill="none"
+                    className="stroke-current text-white"
+                    strokeWidth="3.5"
+                    strokeDasharray={circumference}
+                    strokeLinecap="round"
+                    strokeDashoffset={offset}
+                    style={{
+                      transition: "stroke-dashoffset 0.15s ease-out",
+                    }}
+                  />
+                </svg>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.nav>
+  );
+}
 
 /* ─── Components ──────────────────────────────────────────────────────────── */
 function CopyButton({ code }: { code: string }) {
@@ -249,6 +460,22 @@ function Sidebar({ active, scrollTo }: { active: string; scrollTo: (id: string) 
 export default function DocsPage() {
   const [active, setActive] = useState("introduction");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  // Track scroll progress for the circular indicator
+  const handleScroll = useCallback(() => {
+    const scrollTop = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    if (docHeight > 0) {
+      setScrollProgress(Math.min(scrollTop / docHeight, 1));
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [handleScroll]);
 
   useEffect(() => {
     const obs: IntersectionObserver[] = [];
@@ -731,6 +958,9 @@ CMD ["node", "dist/server.js"]`} />
 
         </main>
       </div>
+
+      {/* Floating bottom nav pill */}
+      <FloatingNavPill active={active} progress={scrollProgress} scrollTo={scrollTo} />
     </div>
   );
 }
