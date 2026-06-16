@@ -24,35 +24,41 @@ import {
   IconSparkles,
   IconBook,
   IconCode,
+  IconArrowsLeftRight,
+  IconPlug,
+  IconBox,
+  IconFileCode,
+  IconCpu,
+  IconListTree,
+  IconScript,
 } from "@tabler/icons-react";
 
-/* ─── Nav ─────────────────────────────────────────────────────────────────── */
+/* ─── Sidebar Nav Data ────────────────────────────────────────────────────── */
 const NAV = [
   {
-    group: "Overview",
+    group: "Getting Started",
     items: [
-      { id: "what-is-it",   label: "What is it?",         icon: <IconSparkles size={14} /> },
-      { id: "how-it-works", label: "How it works",        icon: <IconBolt size={14} /> },
-      { id: "what-you-get", label: "What you get",        icon: <IconBook size={14} /> },
+      { id: "introduction", label: "Introduction", icon: <IconSparkles size={14} /> },
+      { id: "installation", label: "Installation", icon: <IconTerminal2 size={14} /> },
+      { id: "what-you-get", label: "What you get", icon: <IconBox size={14} /> },
     ],
   },
   {
-    group: "Guide",
+    group: "Guides",
     items: [
-      { id: "quickstart",   label: "Quick Start",         icon: <IconTerminal2 size={14} /> },
-      { id: "frameworks",   label: "Frameworks",          icon: <IconApi size={14} /> },
-      { id: "databases",    label: "Databases & ORMs",    icon: <IconDatabase size={14} /> },
-      { id: "auth",         label: "Authentication",      icon: <IconShield size={14} /> },
-      { id: "validation",   label: "Validation",          icon: <IconCheck size={14} /> },
-      { id: "api-type",     label: "API Type",            icon: <IconCode size={14} /> },
-      { id: "tooling",      label: "Tooling",             icon: <IconSettings size={14} /> },
+      { id: "frameworks",  label: "Frameworks",  icon: <IconApi size={14} /> },
+      { id: "databases",   label: "Databases & ORMs", icon: <IconDatabase size={14} /> },
+      { id: "auth",        label: "Authentication",   icon: <IconShield size={14} /> },
+      { id: "validation",  label: "Validation",       icon: <IconCheck size={14} /> },
+      { id: "api-type",    label: "API Type",         icon: <IconCode size={14} /> },
+      { id: "tooling",     label: "Tooling",          icon: <IconSettings size={14} /> },
     ],
   },
   {
     group: "Reference",
     items: [
-      { id: "scripts",      label: "Scripts",             icon: <IconPackage size={14} /> },
-      { id: "structure",    label: "Project Structure",   icon: <IconFolderOpen size={14} /> },
+      { id: "scripts",    label: "Scripts",          icon: <IconScript size={14} /> },
+      { id: "structure",  label: "Project Structure", icon: <IconListTree size={14} /> },
     ],
   },
 ];
@@ -60,45 +66,46 @@ const NAV = [
 const ALL_IDS = NAV.flatMap((g) => g.items.map((i) => i.id));
 
 /* ─── Primitives ──────────────────────────────────────────────────────────── */
-function Code({ code, lang = "bash" }: { code: string; lang?: string }) {
+function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
-  const copy = () => {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
   return (
-    <div className="rounded-md border border-zinc-800 bg-zinc-900 my-4 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-1.5 border-b border-zinc-800">
-        <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider">{lang}</span>
-        <button onClick={copy} className="flex items-center gap-1.5 text-[11px] text-zinc-600 hover:text-zinc-300 transition-colors">
-          {copied
-            ? <><IconCheck size={11} className="text-green-500" /><span className="text-green-500">Copied</span></>
-            : <><IconCopy size={11} />Copy</>}
-        </button>
+    <button
+      onClick={() => { navigator.clipboard.writeText(code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }}
+      className="absolute right-3 top-3 text-zinc-600 hover:text-zinc-300 transition-colors"
+    >
+      {copied ? <IconCheck size={14} className="text-green-500" /> : <IconCopy size={14} />}
+    </button>
+  );
+}
+
+function CodeBlock({ code, lang = "bash" }: { code: string; lang?: string }) {
+  return (
+    <div className="relative my-5 rounded-lg border border-zinc-800 bg-zinc-900">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800">
+        <span className="text-[11px] font-mono text-zinc-600">{lang}</span>
       </div>
-      <pre className="p-4 overflow-x-auto text-[13px] font-mono text-zinc-300 leading-[1.7]"><code>{code}</code></pre>
+      <CopyButton code={code} />
+      <pre className="p-4 overflow-x-auto text-[13px] font-mono text-zinc-300 leading-relaxed"><code>{code}</code></pre>
     </div>
   );
 }
 
-function IC({ children }: { children: React.ReactNode }) {
-  return <code className="font-mono text-[12.5px] text-zinc-300 bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700/50">{children}</code>;
+function InlineCode({ children }: { children: React.ReactNode }) {
+  return <code className="relative rounded bg-zinc-800/60 px-[5px] py-[3px] font-mono text-[13px] text-zinc-200 border border-zinc-700/50">{children}</code>;
 }
 
 function Callout({ type = "info", title, children }: { type?: "info" | "warn" | "tip"; title?: string; children: React.ReactNode }) {
   const s = {
-    info: { wrap: "border-zinc-700 bg-zinc-900/60",    icon: <IconInfoCircle size={14} className="text-zinc-500 shrink-0 mt-0.5" />,       text: "text-zinc-400" },
-    warn: { wrap: "border-yellow-800/50 bg-yellow-950/20", icon: <IconAlertTriangle size={14} className="text-yellow-500 shrink-0 mt-0.5" />, text: "text-yellow-200/80" },
-    tip:  { wrap: "border-sky-800/40 bg-sky-950/20",   icon: <IconBolt size={14} className="text-sky-400 shrink-0 mt-0.5" />,               text: "text-sky-200/80" },
+    info: { wrap: "border-zinc-700/50 bg-zinc-900/40",   icon: <IconInfoCircle size={15} className="text-zinc-500 shrink-0 mt-0.5" /> },
+    warn: { wrap: "border-yellow-700/30 bg-yellow-950/15", icon: <IconAlertTriangle size={15} className="text-yellow-600 shrink-0 mt-0.5" /> },
+    tip:  { wrap: "border-sky-700/30 bg-sky-950/15",      icon: <IconBolt size={15} className="text-sky-500 shrink-0 mt-0.5" /> },
   }[type];
   return (
-    <div className={`my-4 flex gap-3 p-3.5 rounded-md border ${s.wrap}`}>
+    <div className={`my-5 flex gap-3 rounded-lg border p-4 ${s.wrap}`}>
       <div className="mt-0.5">{s.icon}</div>
-      <div className={`text-[13px] leading-relaxed ${s.text}`}>
-        {title && <span className="font-semibold text-zinc-200 block mb-0.5">{title}</span>}
-        {children}
+      <div className="text-[13.5px] leading-relaxed text-zinc-400">
+        {title && <p className="font-semibold text-zinc-200 mb-1">{title}</p>}
+        <div>{children}</div>
       </div>
     </div>
   );
@@ -106,8 +113,7 @@ function Callout({ type = "info", title, children }: { type?: "info" | "warn" | 
 
 function H2({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <h2 id={id} className="text-[17px] font-semibold text-zinc-100 mt-12 mb-3 scroll-mt-20 flex items-center gap-2 group">
-      <span className="w-1 h-4 rounded-full bg-zinc-700 shrink-0" />
+    <h2 id={id} className="scroll-mt-20 text-lg font-semibold text-zinc-100 mt-12 mb-4 group flex items-center gap-2">
       {children}
       <a href={`#${id}`} className="text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity text-sm ml-1">#</a>
     </h2>
@@ -115,25 +121,33 @@ function H2({ id, children }: { id: string; children: React.ReactNode }) {
 }
 
 function H3({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-[14px] font-semibold text-zinc-300 mt-6 mb-2">{children}</h3>;
+  return <h3 className="text-[15px] font-semibold text-zinc-200 mt-7 mb-3">{children}</h3>;
+}
+
+function H4({ children }: { children: React.ReactNode }) {
+  return <h4 className="text-[13.5px] font-medium text-zinc-300 mt-5 mb-2">{children}</h4>;
+}
+
+function P({ children }: { children: React.ReactNode }) {
+  return <p className="text-[14px] text-zinc-400 leading-relaxed mb-4">{children}</p>;
 }
 
 function Divider() {
-  return <div className="border-t border-zinc-800/60 my-10" />;
+  return <div className="border-t border-zinc-800/50 my-10" />;
 }
 
 function Table({ heads, rows }: { heads: string[]; rows: (string | React.ReactNode)[][] }) {
   return (
-    <div className="overflow-x-auto rounded-md border border-zinc-800 my-4">
+    <div className="my-5 overflow-hidden rounded-lg border border-zinc-800">
       <table className="w-full text-[13px]">
         <thead>
-          <tr className="border-b border-zinc-800 bg-zinc-900/40">
-            {heads.map((h) => <th key={h} className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-600">{h}</th>)}
+          <tr className="border-b border-zinc-800 bg-zinc-900/60">
+            {heads.map((h) => <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-zinc-500">{h}</th>)}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} className="border-b border-zinc-800/40 last:border-0 hover:bg-zinc-800/10 transition-colors">
+            <tr key={i} className="border-b border-zinc-800/40 last:border-0">
               {row.map((cell, j) => (
                 <td key={j} className={`px-4 py-3 ${j === 0 ? "font-mono text-zinc-300" : "text-zinc-500"}`}>{cell}</td>
               ))}
@@ -145,18 +159,59 @@ function Table({ heads, rows }: { heads: string[]; rows: (string | React.ReactNo
   );
 }
 
-function Badge({ children, accent }: { children: React.ReactNode; accent?: boolean }) {
+function Badge({ children, variant = "default" }: { children: React.ReactNode; variant?: "default" | "accent" | "outline" }) {
+  const s = {
+    default: "bg-zinc-800/80 text-zinc-400 border-zinc-700/50",
+    accent: "bg-sky-950/40 text-sky-400 border-sky-800/40",
+    outline: "bg-transparent text-zinc-500 border-zinc-700/30",
+  }[variant];
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono border ${accent ? "bg-sky-950/50 text-sky-400 border-sky-800/50" : "bg-zinc-800/60 text-zinc-400 border-zinc-700"}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono border ${s}`}>
       {children}
     </span>
   );
 }
 
+/* ─── Feature Card ────────────────────────────────────────────────────────── */
+function FeatureCard({ icon, name, desc }: { icon: React.ReactNode; name: string; desc: string }) {
+  return (
+    <div className="flex gap-3 rounded-lg border border-zinc-800/60 bg-zinc-900/20 p-3.5">
+      <div className="mt-0.5 shrink-0 text-green-600">{icon}</div>
+      <div>
+        <p className="text-[13.5px] font-medium text-zinc-200">{name}</p>
+        <p className="text-[13px] text-zinc-500 mt-0.5 leading-relaxed">{desc}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Step ────────────────────────────────────────────────────────────────── */
+function Step({ n, title, desc }: { n: number; title: string; desc: string }) {
+  return (
+    <div className="flex gap-4 py-3 border-b border-zinc-800/40 last:border-0">
+      <span className="flex items-center justify-center shrink-0 w-6 h-6 rounded-full bg-zinc-800 text-[11px] font-mono text-zinc-400 mt-0.5">{n}</span>
+      <div>
+        <p className="text-[13.5px] font-medium text-zinc-200">{title}</p>
+        <p className="text-[13px] text-zinc-500 mt-0.5 leading-relaxed">{desc}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Layer Item ──────────────────────────────────────────────────────────── */
+function Layer({ name, desc }: { name: string; desc: string }) {
+  return (
+    <div className="flex gap-3 text-[13.5px] py-1.5">
+      <InlineCode>{name}</InlineCode>
+      <span className="text-zinc-500 leading-relaxed">{desc}</span>
+    </div>
+  );
+}
+
 /* ─── Page ────────────────────────────────────────────────────────────────── */
 export default function DocsPage() {
-  const [active, setActive] = useState("what-is-it");
-  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState("introduction");
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const obs: IntersectionObserver[] = [];
@@ -165,7 +220,7 @@ export default function DocsPage() {
       if (!el) return;
       const o = new IntersectionObserver(
         ([e]) => { if (e.isIntersecting) setActive(id); },
-        { rootMargin: "-15% 0px -75% 0px" }
+        { rootMargin: "-10% 0px -80% 0px" }
       );
       o.observe(el);
       obs.push(o);
@@ -175,293 +230,208 @@ export default function DocsPage() {
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-    setOpen(false);
+    setMobileOpen(false);
   };
 
+  /* ─── Sidebar ──────────────────────────────────────────────────────────── */
   const Sidebar = () => (
-    <aside className="flex flex-col w-48 shrink-0">
+    <aside className="flex flex-col">
+      <div className="flex items-center gap-2 px-3 py-4 border-b border-zinc-800/50 mb-4">
+        <div className="flex items-center justify-center w-6 h-6 rounded-md bg-zinc-800 border border-zinc-700">
+          <IconBolt size={13} className="text-zinc-400" />
+        </div>
+        <span className="text-sm font-medium text-zinc-200">create-tcx-backend</span>
+      </div>
       {NAV.map((group) => (
-        <div key={group.group} className="mb-5">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600 mb-1.5 px-2">{group.group}</p>
+        <div key={group.group} className="mb-4">
+          <p className="text-[11px] font-semibold tracking-widest text-zinc-600 mb-1.5 px-3 uppercase">{group.group}</p>
           <div className="flex flex-col gap-0.5">
             {group.items.map(({ id, label, icon }) => (
               <button
                 key={id}
                 onClick={() => scrollTo(id)}
-                className={`flex items-center gap-2 px-2 py-1.5 rounded text-[12.5px] text-left w-full transition-all ${
+                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] text-left w-full transition-all ${
                   active === id
-                    ? "bg-zinc-800 text-zinc-100 border border-zinc-700"
-                    : "text-zinc-500 hover:text-zinc-300 border border-transparent"
+                    ? "bg-zinc-800/80 text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30"
                 }`}
               >
-                <span className={active === id ? "text-sky-400" : "text-zinc-700"}>{icon}</span>
+                <span className={active === id ? "text-zinc-400" : "text-zinc-600"}>{icon}</span>
                 {label}
-                {active === id && <IconChevronRight size={10} className="ml-auto text-zinc-500" />}
               </button>
             ))}
           </div>
         </div>
       ))}
-      <div className="pt-4 border-t border-zinc-800 flex flex-col gap-0.5 mt-2">
-        <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-2 py-1.5 rounded text-[12.5px] text-zinc-500 hover:text-zinc-300 transition-colors">
-          <IconBrandGithub size={13} />GitHub
+      <div className="mt-auto pt-4 border-t border-zinc-800/50 flex flex-col gap-0.5">
+        <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30 transition-colors">
+          <IconBrandGithub size={14} className="text-zinc-600" />GitHub
         </a>
-        <a href="https://npmjs.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-2 py-1.5 rounded text-[12.5px] text-zinc-500 hover:text-zinc-300 transition-colors">
-          <IconBrandNpm size={13} />npm
+        <a href="https://npmjs.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30 transition-colors">
+          <IconBrandNpm size={14} className="text-zinc-600" />npm
         </a>
       </div>
     </aside>
   );
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-300">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-zinc-800/60 bg-[#0a0a0a]/95 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto flex items-center justify-between px-6 h-12">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setOpen(!open)} className="lg:hidden text-zinc-500 hover:text-zinc-300">
-              {open ? <IconX size={17} /> : <IconMenu2 size={17} />}
-            </button>
-            <Link href="/" className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300 transition-colors text-sm">
+    <div className="min-h-screen bg-[#09090b] text-zinc-300">
+      {/* Mobile Header */}
+      <header className="sticky top-0 z-40 border-b border-zinc-800/60 bg-[#09090b]/95 backdrop-blur-sm lg:hidden">
+        <div className="flex items-center justify-between px-4 h-12">
+          <button onClick={() => setMobileOpen(!mobileOpen)} className="text-zinc-500 hover:text-zinc-300">
+            {mobileOpen ? <IconX size={18} /> : <IconMenu2 size={18} />}
+          </button>
+          <div className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 transition-colors text-sm font-mono">
               <IconArrowLeft size={13} />
-              <span className="font-mono hidden sm:inline">create-tcx-backend</span>
+              home
             </Link>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Badge>v1.0.0</Badge>
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors"><IconBrandGithub size={15} /></a>
-            <a href="https://npmjs.com" target="_blank" rel="noopener noreferrer" className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors"><IconBrandNpm size={15} /></a>
+            <Badge variant="outline">v1.0.0</Badge>
           </div>
         </div>
       </header>
 
-      {open && <div className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setOpen(false)} />}
+      {/* Mobile sidebar overlay */}
+      {mobileOpen && <div className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setMobileOpen(false)} />}
 
-      <div className="max-w-5xl mx-auto flex px-6 py-8 gap-10">
-        <div className="hidden lg:block sticky top-20 self-start h-fit"><Sidebar /></div>
-        <div className={`fixed top-12 left-0 bottom-0 z-30 w-56 bg-[#0d0d0d] border-r border-zinc-800 p-5 overflow-y-auto transition-transform duration-200 lg:hidden ${open ? "translate-x-0" : "-translate-x-full"}`}>
+      {/* Mobile sidebar drawer */}
+      <div className={`fixed top-12 left-0 bottom-0 z-30 w-60 bg-[#0c0c0e] border-r border-zinc-800/60 overflow-y-auto transition-transform duration-200 lg:hidden ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <Sidebar />
+      </div>
+
+      {/* Desktop layout */}
+      <div className="max-w-7xl mx-auto flex px-4 lg:px-6">
+        {/* Left Sidebar (desktop) */}
+        <div className="hidden lg:flex flex-col w-56 shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-zinc-800/50 py-4 pr-3">
           <Sidebar />
         </div>
 
-        <main className="flex-1 min-w-0 max-w-2xl">
+        {/* Main content */}
+        <main className="flex-1 min-w-0 py-8 lg:py-12 px-4 lg:px-8 xl:px-12 max-w-3xl">
 
-          {/* Page header */}
-          <div className="mb-8 pb-6 border-b border-zinc-800/50">
-            <div className="flex items-center gap-2 mb-3">
-              <Badge accent>docs</Badge>
-              <Badge>v1.0.0</Badge>
-              <Badge>Node.js ≥22</Badge>
+          {/* ─── INTRODUCTION ────────────────────────────────────────────── */}
+          <section id="introduction">
+            <div className="flex items-center gap-2 mb-4">
+              <Badge variant="accent">Docs</Badge>
+              <Badge variant="default">v1.0.0</Badge>
+              <Badge variant="default">Node.js ≥22</Badge>
             </div>
-            <h1 className="text-2xl font-bold text-zinc-100 mb-2">create-tcx-backend</h1>
-            <p className="text-zinc-500 text-sm">Scaffold production-ready Node.js backends with a single command.</p>
-          </div>
-
-          {/* ═══════════════════════════════════════════════════════════
-              SECTION: CLI OVERVIEW (inline in What is it?)
-          ════════════════════════════════════════════════════════════ */}
-          <section id="what-is-it">
-            <H2 id="what-is-it">What is it?</H2>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              <IC>create-tcx-backend</IC> is an interactive CLI scaffolder for Node.js backends. Run <IC>npx create-tcx-backend</IC>, answer a few questions about your stack, and get a complete, working backend project tailored to those choices — no manual setup required.
-            </p>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              Think of it like a backend-focused <IC>create-react-app</IC>. One command, then you have a project that compiles, connects to a database, handles errors, and serves health checks — before you write any of your own code.
-            </p>
-
-            <Code code="npx create-tcx-backend" lang="bash" />
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              The CLI does not require a global install. <IC>npx</IC> downloads and runs the latest version on each invocation. Everything stays clean.
-            </p>
+            <h1 className="text-3xl font-bold tracking-tight text-zinc-100 mb-2">create-tcx-backend</h1>
+            <P>
+              Scaffold production-ready Node.js backends with a single command.
+            </P>
+            <P>
+              <InlineCode>create-tcx-backend</InlineCode> is an interactive CLI scaffolder. Run it, answer a few questions about your stack, and get a complete, working backend project — no manual setup required.
+            </P>
 
             <H3>Why it exists</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              Every Node.js project starts with the same 30 minutes of busywork: install the framework, add CORS, wire up dotenv, write a logger, connect the database, set up error handling, create the folder structure. That time adds up across projects and it is the same work every time. <IC>create-tcx-backend</IC> does it for you so you can start building right away.
-            </p>
+            <P>
+              Every Node.js project starts with the same busywork: install the framework, add CORS, wire up dotenv, write a logger, connect the database, set up error handling. That time adds up across projects. <InlineCode>create-tcx-backend</InlineCode> does it all for you so you can start building right away.
+            </P>
+
+            <div className="my-6 grid gap-3 sm:grid-cols-2">
+              <FeatureCard icon={<IconCheck size={14} />} name="Plugin pipeline" desc="Composable generators for framework, DB, auth, validation, and tooling — all independent, all fit together." />
+              <FeatureCard icon={<IconCheck size={14} />} name="Consistent structure" desc="Same folder layout regardless of choices. Optional directories appear only when needed." />
+              <FeatureCard icon={<IconCheck size={14} />} name="No lock-in" desc="Generated code is yours. Delete, rename, reorganize — it's a starting point, not a framework." />
+              <FeatureCard icon={<IconCheck size={14} />} name="Zero config" desc="Runs via npx. No global install, no configuration files, no setup." />
+            </div>
+          </section>
+
+          <Divider />
+
+          {/* ─── INSTALLATION ────────────────────────────────────────────── */}
+          <section id="installation">
+            <H2 id="installation">Installation</H2>
+            <P>
+              No installation needed. Run directly with <InlineCode>npx</InlineCode>:
+            </P>
+
+            <CodeBlock code="npx create-tcx-backend" lang="bash" />
 
             <Callout type="tip" title="Requirements">
-              Node.js <strong>≥ 22.0.0</strong>. Run <IC>node --version</IC> to check. Use <a href="https://github.com/nvm-sh/nvm" className="underline underline-offset-2">nvm</a> to switch versions if needed.
+              Node.js <strong className="text-zinc-200">≥ 22.0.0</strong> required. Run <InlineCode>node --version</InlineCode> to check. Use <a href="https://github.com/nvm-sh/nvm" className="underline underline-offset-2 text-zinc-300 hover:text-zinc-100">nvm</a> to manage versions.
             </Callout>
-          </section>
 
-          <Divider />
+            <H3>Prompt flow</H3>
+            <P>
+              The CLI walks you through 12 questions. Here's what it asks and why:
+            </P>
 
-          {/* ═══════════════════════════════════════════════════════════
-              SECTION: HOW IT WORKS
-          ════════════════════════════════════════════════════════════ */}
-          <section id="how-it-works">
-            <H2 id="how-it-works">How it works</H2>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              The CLI uses a <strong className="text-zinc-300">plugin pipeline</strong>. Each option you pick (framework, database, ORM, auth, validation, tooling) registers one or more plugins. When you confirm your choices, the pipeline runs in two phases:
-            </p>
-
-            <div className="space-y-2 mb-4">
-              <div className="p-3 rounded-md border border-zinc-800 bg-zinc-900/20 text-[13px]">
-                <span className="font-mono text-zinc-300">1. Dependency injection</span>
-                <p className="text-zinc-500 mt-1 leading-relaxed">Each plugin adds its dependencies to <IC>package.json</IC> — no orphan packages, no conflicts.</p>
-              </div>
-              <div className="p-3 rounded-md border border-zinc-800 bg-zinc-900/20 text-[13px]">
-                <span className="font-mono text-zinc-300">2. File generation</span>
-                <p className="text-zinc-500 mt-1 leading-relaxed">Each plugin writes its files into an in-memory context. When all plugins have run, the engine writes everything to disk, installs dependencies, and optionally initializes git.</p>
-              </div>
+            <div className="my-4">
+              <Step n={1} title="Project name" desc={'Becomes the folder name and package.json name. Use "." to scaffold in the current directory.'} />
+              <Step n={2} title="Package manager" desc="npm, pnpm, yarn, or bun. Used for dependency installation and script execution." />
+              <Step n={3} title="Framework" desc="Express, Fastify, or Hono. Determines the HTTP layer — the structure stays identical across all three." />
+              <Step n={4} title="Language" desc="TypeScript gives you tsconfig.json, typed declarations, and tsx for hot-reload. JavaScript uses nodemon." />
+              <Step n={5} title="Module system" desc="ES Modules (import/export) or CommonJS (require/module.exports). TypeScript projects default to ESM." />
+              <Step n={6} title="Database" desc="PostgreSQL, MySQL, SQLite, MongoDB, or None. Determines which drivers are installed." />
+              <Step n={7} title="ORM" desc="Prisma, Drizzle, Mongoose, or raw driver. Options are filtered based on your database choice." />
+              <Step n={8} title="Auth" desc="JWT (bcryptjs + jsonwebtoken), Better Auth, or None." />
+              <Step n={9} title="Validation" desc="Zod or None." />
+              <Step n={10} title="API type" desc="REST (ready). GraphQL (Apollo) and tRPC scaffolding are in development." />
+              <Step n={11} title="Tooling" desc="Multi-select: Docker, Swagger, ESLint, Prettier, Husky — any combination." />
+              <Step n={12} title="Git & install" desc="Optionally initialize a git repo and install dependencies automatically." />
             </div>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              Plugins are composable and independent. The Express generator and the Prisma generator and the JWT generator all run separately and produce files that fit together. You are not pulling from a monolithic template.
-            </p>
-
-            <H3>The prompt flow</H3>
-            <div className="my-4 space-y-0">
-              {[
-                { q: "Project name", a: "Becomes the folder name and the package.json name field. Use \".\" to scaffold in the current directory." },
-                { q: "Package manager", a: "npm, pnpm, yarn, or bun. Used for dependency installation and script execution." },
-                { q: "Framework", a: "Express, Fastify, or Hono. Picks the HTTP layer — the rest of the structure stays the same." },
-                { q: "Language", a: "TypeScript (tsconfig, types) or JavaScript (simpler setup, nodemon for watch mode)." },
-                { q: "Module system", a: "ES Modules (import/export) or CommonJS (require/module.exports). TypeScript projects default to ESM." },
-                { q: "Database", a: "PostgreSQL, MySQL, SQLite, MongoDB, or None. Determines which drivers are installed." },
-                { q: "ORM", a: "Prisma, Drizzle, Mongoose, or raw driver. Options are filtered based on your database choice." },
-                { q: "Auth", a: "JWT (bcryptjs + jsonwebtoken), Better Auth, or None." },
-                { q: "Validation", a: "Zod or None." },
-                { q: "API type", a: "REST (ready), GraphQL (Apollo — scaffolding in development), tRPC (scaffolding in development)." },
-                { q: "Tooling (multi)", a: "Docker, Swagger, ESLint, Prettier, Husky. Any combination, all independent." },
-                { q: "Git & install", a: "Optionally initialize a git repo and install dependencies automatically." },
-              ].map(({ q, a }, i) => (
-                <div key={q} className="flex gap-4 py-3 border-b border-zinc-800/40 last:border-0">
-                  <span className="text-[11px] font-mono text-zinc-600 mt-0.5 shrink-0 w-5 text-right">{i + 1}</span>
-                  <div>
-                    <p className="text-[13px] font-medium text-zinc-300 mb-0.5">{q}</p>
-                    <p className="text-[12.5px] text-zinc-500 leading-relaxed">{a}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mt-4">
-              After the prompts, the CLI writes all files, installs dependencies, and prints a summary. The whole process takes under a minute.
-            </p>
 
             <Callout type="info">
-              The CLI currently supports <strong className="text-zinc-300">interactive mode only</strong>. There are no <IC>--yes</IC> or <IC>--template</IC> flags yet — all choices go through the prompt system.
+              After all prompts, the CLI writes files, installs dependencies, and prints a summary. The whole process takes under a minute.
             </Callout>
-          </section>
 
-          <Divider />
-
-          {/* ═══════════════════════════════════════════════════════════
-              SECTION: WHAT YOU GET
-          ════════════════════════════════════════════════════════════ */}
-          <section id="what-you-get">
-            <H2 id="what-you-get">What you get</H2>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              Every generated project — regardless of which options you chose — ships with this baseline. These are the files you always get, no matter what.
-            </p>
-
-            <div className="space-y-3 mb-6">
-              {[
-                {
-                  name: "HTTP server",
-                  desc: "Fully configured with CORS, JSON body parsing, and a global error handler. Pick Express, Fastify, or Hono — all three produce the same structure.",
-                },
-                {
-                  name: "/api/health endpoint",
-                  desc: "Returns status, timestamp, and uptime. Use it as a readiness check in Docker or a load balancer.",
-                },
-                {
-                  name: "src/config/index.ts",
-                  desc: "Reads environment variables from .env via dotenv and exports a typed config object. Every other file imports from here — no scattered process.env calls.",
-                },
-                {
-                  name: "src/utils/logger.ts",
-                  desc: "Lightweight logger with .info(), .warn(), .error(). No heavy dependencies — swap it for Winston or Pino later.",
-                },
-                {
-                  name: ".env + .env.example",
-                  desc: "All required keys pre-filled with safe placeholders. The .env.example has the same keys with values stripped — safe to commit.",
-                },
-                {
-                  name: "npm scripts",
-                  desc: "dev, build, and start scripts wired to the correct commands for your language and framework.",
-                },
-              ].map(({ name, desc }) => (
-                <div key={name} className="flex gap-3 p-3 rounded-md border border-zinc-800/60 bg-zinc-900/20">
-                  <IconCheck size={14} className="text-green-600 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-[13px] font-medium text-zinc-300">{name}</p>
-                    <p className="text-[12.5px] text-zinc-500 mt-0.5 leading-relaxed">{desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              On top of this baseline, you get whatever you asked for — database layer, auth middleware, Zod validators, Docker config, Swagger UI, and so on. Each is covered in the sections below.
-            </p>
-          </section>
-
-          <Divider />
-
-          {/* ═══════════════════════════════════════════════════════════
-              SECTION: QUICK START
-          ════════════════════════════════════════════════════════════ */}
-          <section id="quickstart">
-            <H2 id="quickstart">Quick Start</H2>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              Run the scaffolder:
-            </p>
-            <Code code="npx create-tcx-backend" lang="bash" />
-
-            <H3>After the prompts finish</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              The CLI installs dependencies automatically. Once done:
-            </p>
-            <Code code={`cd your-project-name\nnpm run dev`} lang="bash" />
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              Open <IC>http://localhost:5000/api/health</IC>. You should see:
-            </p>
-            <Code lang="json" code={`{
+            <H3>What happens next</H3>
+            <P>After the CLI finishes, navigate into your project and start the dev server:</P>
+            <CodeBlock code={`cd your-project-name\nnpm run dev`} lang="bash" />
+            <P>
+              Open <InlineCode>http://localhost:5000/api/health</InlineCode>. You should see:
+            </P>
+            <CodeBlock lang="json" code={`{
   "status": "OK",
   "timestamp": "2026-06-16T00:00:00.000Z",
   "uptime": 1.24
 }`} />
 
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              The server is running. Now edit <IC>.env</IC> with your real database credentials, run your first migration if applicable, and start building.
-            </p>
-
-            <H3>First-time setup with Prisma or Drizzle</H3>
-            <Code lang="bash" code={`# Generate the client / migration files
+            <H4>First-time setup with Prisma or Drizzle</H4>
+            <CodeBlock lang="bash" code={`# Generate the client / migration files
 npm run db:generate
 
 # Run the migration against your database
 npm run db:migrate`} />
 
             <Callout type="warn" title="Generate before starting">
-              If you picked Prisma or Drizzle and try to run the server before generating, it will crash immediately — the client code does not exist yet.
+              If you picked Prisma or Drizzle and try to start the server before generating, it will crash immediately — the client code does not exist yet.
             </Callout>
-
-            <H3>Scaffold in the current directory</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              Enter <IC>.</IC> as the project name to scaffold directly into the current directory. The CLI warns if the directory is non-empty.
-            </p>
           </section>
 
           <Divider />
 
-          {/* ═══════════════════════════════════════════════════════════
-              SECTION: FRAMEWORKS
-          ════════════════════════════════════════════════════════════ */}
+          {/* ─── WHAT YOU GET ────────────────────────────────────────────── */}
+          <section id="what-you-get">
+            <H2 id="what-you-get">What you get</H2>
+            <P>
+              Every generated project — regardless of your choices — ships with this baseline:
+            </P>
+
+            <div className="space-y-2.5 mb-6">
+              <FeatureCard icon={<IconCheck size={14} />} name="HTTP server" desc="Configured with CORS, JSON body parsing, and a global error handler. Pick Express, Fastify, or Hono." />
+              <FeatureCard icon={<IconCheck size={14} />} name="/api/health endpoint" desc="Returns status, timestamp, and uptime. Ready for Docker health checks and load balancers." />
+              <FeatureCard icon={<IconCheck size={14} />} name="src/config/index.ts" desc="Reads .env via dotenv and exports a typed config object. No scattered process.env calls." />
+              <FeatureCard icon={<IconCheck size={14} />} name="src/utils/logger.ts" desc="Lightweight .info()/.warn()/.error() logger. Swap it for Winston or Pino when you're ready." />
+              <FeatureCard icon={<IconCheck size={14} />} name=".env + .env.example" desc="All required keys pre-filled with safe placeholders. .env.example has values stripped — safe to commit." />
+              <FeatureCard icon={<IconCheck size={14} />} name="npm scripts" desc="dev, build, and start wired to the correct commands for your language and framework." />
+            </div>
+
+            <P>
+              On top of this, you get whatever you asked for — database layer, auth middleware, Zod validators, Docker config, Swagger UI, and more. Covered in the guides below.
+            </P>
+          </section>
+
+          <Divider />
+
+          {/* ─── FRAMEWORKS ──────────────────────────────────────────────── */}
           <section id="frameworks">
             <H2 id="frameworks">Frameworks</H2>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              Pick one framework at scaffold time. All three produce the same folder structure — only the framework-specific wiring inside <IC>src/app.ts</IC> differs.
-            </p>
+            <P>
+              Pick one framework at scaffold time. All three produce the same folder structure — only the framework-specific wiring in <InlineCode>src/app.ts</InlineCode> differs.
+            </P>
 
             <Table
               heads={["Framework", "Version", "Wiring"]}
@@ -472,10 +442,10 @@ npm run db:migrate`} />
               ]}
             />
 
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              The server entry point always follows the same pattern — connect the database, then start listening:
-            </p>
-            <Code lang="typescript" code={`// src/server.ts
+            <P>
+              The server entry point follows the same pattern for all three:
+            </P>
+            <CodeBlock lang="typescript" code={`// src/server.ts
 import app from "./app";
 import { connectDatabase } from "./database";
 import { config } from "./config";
@@ -498,28 +468,25 @@ main().catch((err) => {
             </Callout>
 
             <H3>Which framework should I pick?</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              <strong className="text-zinc-300">Express</strong> if you want the largest ecosystem and the most community support. <strong className="text-zinc-300">Fastify</strong> if you care about raw performance and like its plugin architecture. <strong className="text-zinc-300">Hono</strong> if you want something modern, lightweight, and portable to edge runtimes later. All three are excellent for REST APIs.
-            </p>
+            <P>
+              <strong className="text-zinc-200">Express</strong> if you want the largest ecosystem and most community support. <strong className="text-zinc-200">Fastify</strong> if you care about raw performance and like its plugin architecture. <strong className="text-zinc-200">Hono</strong> if you want something modern, lightweight, and portable to edge runtimes later. All three are excellent for REST APIs.
+            </P>
           </section>
 
           <Divider />
 
-          {/* ═══════════════════════════════════════════════════════════
-              SECTION: DATABASES
-          ════════════════════════════════════════════════════════════ */}
+          {/* ─── DATABASES ───────────────────────────────────────────────── */}
           <section id="databases">
             <H2 id="databases">Databases & ORMs</H2>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              The database layer lives in <IC>src/database/</IC>. Every option exports a <IC>connectDatabase()</IC> function that <IC>src/server.ts</IC> awaits on startup, plus a client or instance you import in your services.
-            </p>
+            <P>
+              The database layer lives in <InlineCode>src/database/</InlineCode>. Every option exports a <InlineCode>connectDatabase()</InlineCode> function and a client you import in your services.
+            </P>
 
             <H3>Prisma</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              The most batteries-included option. Generates <IC>prisma/schema.prisma</IC> with a starter <IC>User</IC> model and a singleton PrismaClient in <IC>src/database/index.ts</IC>. Supports <strong className="text-zinc-300">PostgreSQL, MySQL, SQLite</strong>.
-            </p>
-            <Code lang="typescript" code={`// src/database/index.ts
+            <P>
+              The most batteries-included option. Generates <InlineCode>prisma/schema.prisma</InlineCode> with a starter <InlineCode>User</InlineCode> model and a singleton PrismaClient. Supports <strong className="text-zinc-200">PostgreSQL, MySQL, SQLite</strong>.
+            </P>
+            <CodeBlock lang="typescript" code={`// src/database/index.ts
 import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
@@ -531,17 +498,13 @@ if (process.env.NODE_ENV !== "production") {
 
 export async function connectDatabase() {
   await prisma.$connect();
-}
-
-// In any service file:
-// import { prisma } from "../database";
-// const user = await prisma.user.findUnique({ where: { id } });`} />
+}`} />
 
             <H3>Drizzle</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              A TypeScript-first ORM with a SQL-like query builder. Generates <IC>drizzle.config.ts</IC>, a <IC>src/database/schema.ts</IC> with a <IC>users</IC> table, and a connection using the right driver. Supports <strong className="text-zinc-300">PostgreSQL, MySQL, SQLite</strong>.
-            </p>
-            <Code lang="typescript" code={`// src/database/schema.ts (PostgreSQL example)
+            <P>
+              A TypeScript-first ORM with a SQL-like query builder. Generates <InlineCode>drizzle.config.ts</InlineCode>, a <InlineCode>src/database/schema.ts</InlineCode> with a <InlineCode>users</InlineCode> table, and the right driver connection. Supports <strong className="text-zinc-200">PostgreSQL, MySQL, SQLite</strong>.
+            </P>
+            <CodeBlock lang="typescript" code={`// src/database/schema.ts (PostgreSQL example)
 import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -552,10 +515,10 @@ export const users = pgTable("users", {
 });`} />
 
             <H3>Mongoose</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              The classic MongoDB ODM. Generates <IC>connectDatabase()</IC> that calls <IC>mongoose.connect()</IC> using the <IC>MONGODB_URI</IC> from your <IC>.env</IC>. Only works with <strong className="text-zinc-300">MongoDB</strong>.
-            </p>
-            <Code lang="typescript" code={`// src/database/index.ts
+            <P>
+              The classic MongoDB ODM. Generates <InlineCode>connectDatabase()</InlineCode> that calls <InlineCode>mongoose.connect()</InlineCode> using the <InlineCode>MONGODB_URI</InlineCode> from your <InlineCode>.env</InlineCode>. Works with <strong className="text-zinc-200">MongoDB</strong> only.
+            </P>
+            <CodeBlock lang="typescript" code={`// src/database/index.ts
 import mongoose from "mongoose";
 import { config } from "../config";
 
@@ -563,48 +526,45 @@ export async function connectDatabase() {
   await mongoose.connect(config.mongodbUri);
 }`} />
 
-            <H3>No ORM</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              Generates raw driver connection code — <IC>pg.Pool</IC> for PostgreSQL, <IC>mysql2</IC> for MySQL, <IC>better-sqlite3</IC> for SQLite, or the native MongoDB driver. Pick this when you want to write raw SQL or manage your own query layer.
-            </p>
+            <H3>Native driver</H3>
+            <P>
+              Raw driver connection code — <InlineCode>pg.Pool</InlineCode> for PostgreSQL, <InlineCode>mysql2</InlineCode> for MySQL, <InlineCode>better-sqlite3</InlineCode> for SQLite, or the native MongoDB driver. Pick this when you want to write raw SQL or manage your own abstraction.
+            </P>
 
             <Callout type="warn" title="Run db:generate first">
-              With Prisma or Drizzle, always run <IC>npm run db:generate</IC> before starting the server. The client code is generated — it does not exist until you run this.
+              With Prisma or Drizzle, always run <InlineCode>npm run db:generate</InlineCode> before starting the server. The generated client does not exist until you run this.
             </Callout>
           </section>
 
           <Divider />
 
-          {/* ═══════════════════════════════════════════════════════════
-              SECTION: AUTH
-          ════════════════════════════════════════════════════════════ */}
+          {/* ─── AUTH ────────────────────────────────────────────────────── */}
           <section id="auth">
             <H2 id="auth">Authentication</H2>
+            <P>
+              Auth is optional. Skip it for internal services or public APIs with no user accounts. If you want it, choose between two strategies:
+            </P>
 
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              Auth is optional. Skip it for internal services, public APIs with no user accounts, or if you handle auth at a different layer. If you do want it, you get one of two strategies:
-            </p>
-
-            <H3>JWT <Badge accent>recommended</Badge></H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              Scaffolds two files and registers auth routes at <IC>/api/auth</IC>:
-            </p>
+            <H3>JWT <Badge variant="accent">recommended</Badge></H3>
+            <P>
+              Scaffolds auth routes at <InlineCode>/api/auth</InlineCode> with a controller and protect middleware:
+            </P>
             <div className="space-y-2 mb-4">
-              <div className="p-3 rounded-md border border-zinc-800 bg-zinc-900/20 text-[13px]">
-                <IC>auth.controller.ts</IC>
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3.5 text-[13px]">
+                <InlineCode>auth.controller.ts</InlineCode>
                 <p className="text-zinc-500 mt-1.5 leading-relaxed">
-                  <IC>POST /api/auth/register</IC> — hashes password with <IC>bcryptjs</IC>, saves the user, returns a JWT.<br />
-                  <IC>POST /api/auth/login</IC> — verifies credentials, returns a signed JWT.
+                  <InlineCode>POST /api/auth/register</InlineCode> — hashes password with bcryptjs, returns a JWT.<br />
+                  <InlineCode>POST /api/auth/login</InlineCode> — verifies credentials, returns a signed JWT.
                 </p>
               </div>
-              <div className="p-3 rounded-md border border-zinc-800 bg-zinc-900/20 text-[13px]">
-                <IC>auth.middleware.ts</IC>
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3.5 text-[13px]">
+                <InlineCode>auth.middleware.ts</InlineCode>
                 <p className="text-zinc-500 mt-1.5 leading-relaxed">
-                  Exports a <IC>protect</IC> middleware. Reads <IC>Authorization: Bearer &lt;token&gt;</IC>, verifies with <IC>jsonwebtoken</IC>, attaches decoded payload to <IC>req.user</IC>. Returns <IC>401</IC> on missing or invalid token.
+                  Exports <InlineCode>protect</InlineCode> middleware. Reads <InlineCode>Authorization: Bearer &lt;token&gt;</InlineCode>, verifies with jsonwebtoken, attaches decoded payload to <InlineCode>req.user</InlineCode>. Returns 401 on failure.
                 </p>
               </div>
             </div>
-            <Code lang="typescript" code={`// Protecting any route
+            <CodeBlock lang="typescript" code={`// Protecting any route
 import { protect } from "../middlewares/auth.middleware";
 
 router.get("/me", protect, async (req, res) => {
@@ -612,30 +572,26 @@ router.get("/me", protect, async (req, res) => {
   res.json({ user });
 });`} />
             <Callout type="warn" title="Set JWT_SECRET before deploying">
-              The generated <IC>.env</IC> has a placeholder value. Replace it with a long random string (<IC>openssl rand -base64 32</IC>). Never commit the real secret.
+              The generated <InlineCode>.env</InlineCode> has a placeholder. Replace it with a long random string (<InlineCode>openssl rand -base64 32</InlineCode>). Never commit the real secret.
             </Callout>
 
             <H3>Better Auth</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              Scaffolds <IC>better-auth</IC> config in <IC>src/config/auth.ts</IC> and mounts the handler at <IC>/api/auth/*</IC>. Better Auth handles sessions, OAuth providers, email/password, email verification, and more out of the box. See the{" "}
-              <a href="https://better-auth.com" target="_blank" rel="noopener noreferrer" className="text-zinc-300 underline underline-offset-2">Better Auth docs</a>{" "}
+            <P>
+              Scaffolds <InlineCode>better-auth</InlineCode> config in <InlineCode>src/config/auth.ts</InlineCode> and mounts the handler at <InlineCode>/api/auth/*</InlineCode>. Handles sessions, OAuth providers, email/password, email verification, and more. See{" "}
+              <a href="https://better-auth.com" target="_blank" rel="noopener noreferrer" className="text-zinc-300 underline underline-offset-2 hover:text-zinc-100">Better Auth docs</a>{" "}
               for provider configuration.
-            </p>
+            </P>
           </section>
 
           <Divider />
 
-          {/* ═══════════════════════════════════════════════════════════
-              SECTION: VALIDATION
-          ════════════════════════════════════════════════════════════ */}
+          {/* ─── VALIDATION ──────────────────────────────────────────────── */}
           <section id="validation">
             <H2 id="validation">Validation</H2>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              If you select Zod, the CLI generates a <IC>src/app/validators/</IC> directory with starter schemas. Define schemas in validator files, call <IC>safeParse()</IC> in your controller, and bail early if validation fails.
-            </p>
-
-            <Code lang="typescript" code={`// src/app/validators/auth.validator.ts
+            <P>
+              Selecting Zod generates a <InlineCode>src/app/validators/</InlineCode> directory with starter schemas. Pattern: define schemas, call <InlineCode>safeParse()</InlineCode> in your controller, bail early on failure.
+            </P>
+            <CodeBlock lang="typescript" code={`// src/app/validators/auth.validator.ts
 import { z } from "zod";
 
 export const registerSchema = z.object({
@@ -644,10 +600,8 @@ export const registerSchema = z.object({
   name:     z.string().min(1).optional(),
 });
 
-// Infer the TypeScript type directly from the schema
 export type RegisterInput = z.infer<typeof registerSchema>;`} />
-
-            <Code lang="typescript" code={`// src/app/controllers/auth.controller.ts
+            <CodeBlock lang="typescript" code={`// src/app/controllers/auth.controller.ts
 import { registerSchema } from "../validators/auth.validator";
 
 export const register = async (req, res, next) => {
@@ -660,28 +614,22 @@ export const register = async (req, res, next) => {
     });
   }
 
-  // result.data is fully typed
   const { email, password } = result.data;
-  // ...
+  // result.data is fully typed
 };`} />
-
             <Callout type="tip">
-              Use <IC>safeParse</IC> instead of <IC>parse</IC> in request handlers. It never throws — it returns a result object you can inspect, keeping error handling explicit and predictable.
+              Use <InlineCode>safeParse</InlineCode> instead of <InlineCode>parse</InlineCode> in request handlers. It never throws — it returns a result object you can inspect, making error handling explicit and predictable.
             </Callout>
           </section>
 
           <Divider />
 
-          {/* ═══════════════════════════════════════════════════════════
-              SECTION: API TYPE
-          ════════════════════════════════════════════════════════════ */}
+          {/* ─── API TYPE ────────────────────────────────────────────────── */}
           <section id="api-type">
             <H2 id="api-type">API Type</H2>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              The CLI asks which API layer you want. This determines how your routes and controllers are structured.
-            </p>
-
+            <P>
+              The CLI asks which API layer you want. This determines how routes and controllers are structured.
+            </P>
             <Table
               heads={["Type", "Status", "Description"]}
               rows={[
@@ -690,33 +638,28 @@ export const register = async (req, res, next) => {
                 ["tRPC", "In development", "End-to-end type-safe API with tRPC server adapter"],
               ]}
             />
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              <strong className="text-zinc-300">REST</strong> is fully scaffolded with controllers, services, routes, and middleware — the entire pipeline described in these docs. GraphQL and tRPC scaffolding is in active development. Selecting them currently generates the REST structure as a starting point.
-            </p>
-
+            <P>
+              <strong className="text-zinc-200">REST</strong> is fully scaffolded with the complete controller/service/route pipeline described in these docs. GraphQL and tRPC are in active development — selecting them currently generates the REST structure as a starting point.
+            </P>
             <Callout type="info">
-              Regardless of API type, the <IC>/api/health</IC> endpoint, database connection, error handling, and tooling are always generated the same way.
+              Regardless of API type, the <InlineCode>/api/health</InlineCode> endpoint, database connection, error handling, and tooling are always generated the same way.
             </Callout>
           </section>
 
           <Divider />
 
-          {/* ═══════════════════════════════════════════════════════════
-              SECTION: TOOLING
-          ════════════════════════════════════════════════════════════ */}
+          {/* ─── TOOLING ─────────────────────────────────────────────────── */}
           <section id="tooling">
             <H2 id="tooling">Tooling</H2>
-
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              Tooling options are independent of each other and of the core project. Pick whichever ones match how you work.
-            </p>
+            <P>
+              Tooling options are independent of each other and of the core project. Pick whatever fits your workflow.
+            </P>
 
             <H3>Docker</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              Generates a multi-stage <IC>Dockerfile</IC> and <IC>.dockerignore</IC>. The <IC>builder</IC> stage compiles TypeScript; the <IC>runner</IC> stage copies only compiled output and production dependencies.
-            </p>
-            <Code lang="dockerfile" code={`FROM node:22-alpine AS builder
+            <P>
+              Multi-stage <InlineCode>Dockerfile</InlineCode> and <InlineCode>.dockerignore</InlineCode>. The builder stage compiles TypeScript; the runner stage copies only compiled output and production dependencies.
+            </P>
+            <CodeBlock lang="dockerfile" code={`FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json .
 RUN npm ci
@@ -732,42 +675,34 @@ EXPOSE 5000
 CMD ["node", "dist/server.js"]`} />
 
             <H3>Swagger / OpenAPI</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              Generates <IC>src/config/swagger.ts</IC> with a starter OpenAPI 3.0 document and mounts Swagger UI at <IC>/api-docs</IC>. Currently <strong className="text-zinc-300">Express only</strong>. Open <IC>http://localhost:5000/api-docs</IC> to explore your API interactively.
-            </p>
+            <P>
+              Generates <InlineCode>src/config/swagger.ts</InlineCode> with a starter OpenAPI 3.0 document and mounts Swagger UI at <InlineCode>/api-docs</InlineCode>. Currently <strong className="text-zinc-200">Express only</strong>.
+            </P>
 
             <H3>ESLint</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              Generates <IC>eslint.config.js</IC> using the flat config format. TypeScript projects automatically get <IC>typescript-eslint</IC> with strict rules. Run with <IC>npm run lint</IC>.
-            </p>
+            <P>
+              Generates <InlineCode>eslint.config.js</InlineCode> using the flat config format. TypeScript projects get <InlineCode>typescript-eslint</InlineCode> with strict rules. Run with <InlineCode>npm run lint</InlineCode>.
+            </P>
 
             <H3>Prettier</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              Generates <IC>.prettierrc</IC> pre-configured with:
-            </p>
-            <Code lang="json" code={`{
-  "singleQuote": true,
-  "semi": true,
-  "printWidth": 100,
-  "trailingComma": "es5"
-}`} />
+            <P>
+              Generates <InlineCode>.prettierrc</InlineCode> pre-configured with single quotes, semicolons, 100 print width, and trailing commas.
+            </P>
 
             <H3>Husky + lint-staged</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              Adds a Git pre-commit hook via Husky and a <IC>.lintstagedrc</IC> that runs ESLint and Prettier against staged files before each commit. Ensures no unformatted or rule-violating code enters your history.
-            </p>
+            <P>
+              Adds a Git pre-commit hook that runs ESLint and Prettier against staged files. Ensures no unformatted or rule-violating code enters your history.
+            </P>
           </section>
 
           <Divider />
 
-          {/* ═══════════════════════════════════════════════════════════
-              SECTION: SCRIPTS
-          ════════════════════════════════════════════════════════════ */}
+          {/* ─── SCRIPTS ─────────────────────────────────────────────────── */}
           <section id="scripts">
             <H2 id="scripts">Scripts</H2>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              Scripts in the generated project's <IC>package.json</IC>. Some are conditional based on your selections.
-            </p>
+            <P>
+              The generated project's <InlineCode>package.json</InlineCode> includes these scripts. Some are conditional based on your selections.
+            </P>
             <Table
               heads={["Script", "What it runs", "When present"]}
               rows={[
@@ -784,16 +719,14 @@ CMD ["node", "dist/server.js"]`} />
 
           <Divider />
 
-          {/* ═══════════════════════════════════════════════════════════
-              SECTION: STRUCTURE
-          ════════════════════════════════════════════════════════════ */}
+          {/* ─── STRUCTURE ───────────────────────────────────────────────── */}
           <section id="structure">
             <H2 id="structure">Project Structure</H2>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              The generated project always uses this structure. Optional directories only appear if you selected the corresponding feature.
-            </p>
+            <P>
+              The generated project always uses this structure. Optional directories only appear when the corresponding feature is selected.
+            </P>
 
-            <Code lang="text" code={`your-project/
+            <CodeBlock lang="text" code={`your-project/
 ├── prisma/
 │   └── schema.prisma          # Prisma schema + User model  [Prisma only]
 ├── src/
@@ -828,23 +761,16 @@ CMD ["node", "dist/server.js"]`} />
 ├── tsconfig.json              # [TypeScript only]
 └── package.json`} />
 
-            <H3>The layered architecture</H3>
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              The structure enforces a consistent data flow: <IC>route</IC> → <IC>middleware</IC> → <IC>controller</IC> → <IC>service</IC> → <IC>database</IC>. Each layer has one job.
-            </p>
-            <div className="space-y-2 mt-3">
-              {[
-                ["routes/", "Map HTTP paths to controller functions. No logic here."],
-                ["controllers/", "Validate the request (Zod), call a service, return the response."],
-                ["services/", "Own all business logic and database calls. Testable in isolation — no req/res objects."],
-                ["database/", "Export the client and connection function. Services import from here."],
-                ["config/", "One place for all environment config. Every other file imports from here."],
-              ].map(([layer, desc]) => (
-                <div key={layer as string} className="flex gap-3 text-[13px]">
-                  <IC>{layer}</IC>
-                  <span className="text-zinc-500 leading-relaxed">{desc}</span>
-                </div>
-              ))}
+            <H3>Layered architecture</H3>
+            <P>
+              The structure enforces a consistent data flow: <InlineCode>route</InlineCode> → <InlineCode>middleware</InlineCode> → <InlineCode>controller</InlineCode> → <InlineCode>service</InlineCode> → <InlineCode>database</InlineCode>. Each layer has one job.
+            </P>
+            <div className="mt-3 mb-6 space-y-1.5">
+              <Layer name="routes/" desc="Map HTTP paths to controller functions. No logic here." />
+              <Layer name="controllers/" desc="Validate the request (Zod), call a service, return the response." />
+              <Layer name="services/" desc="Own all business logic and database calls. Testable in isolation." />
+              <Layer name="database/" desc="Export the client and connection function. Services import from here." />
+              <Layer name="config/" desc="One place for all environment config. Every file imports from here." />
             </div>
 
             {/* Footer */}
@@ -857,6 +783,7 @@ CMD ["node", "dist/server.js"]`} />
           </section>
 
         </main>
+
       </div>
     </div>
   );
