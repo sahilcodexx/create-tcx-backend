@@ -23,6 +23,7 @@ import {
   IconBolt,
   IconSparkles,
   IconBook,
+  IconCode,
 } from "@tabler/icons-react";
 
 /* ─── Nav ─────────────────────────────────────────────────────────────────── */
@@ -43,6 +44,7 @@ const NAV = [
       { id: "databases",    label: "Databases & ORMs",    icon: <IconDatabase size={14} /> },
       { id: "auth",         label: "Authentication",      icon: <IconShield size={14} /> },
       { id: "validation",   label: "Validation",          icon: <IconCheck size={14} /> },
+      { id: "api-type",     label: "API Type",            icon: <IconCode size={14} /> },
       { id: "tooling",      label: "Tooling",             icon: <IconSettings size={14} /> },
     ],
   },
@@ -255,27 +257,33 @@ export default function DocsPage() {
           </div>
 
           {/* ═══════════════════════════════════════════════════════════
-              SECTION: WHAT IS IT
+              SECTION: CLI OVERVIEW (inline in What is it?)
           ════════════════════════════════════════════════════════════ */}
           <section id="what-is-it">
             <H2 id="what-is-it">What is it?</H2>
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              <IC>create-tcx-backend</IC> is a command-line scaffolder for Node.js. It asks you a few questions about what you want — which HTTP framework, which database, whether you need auth, what tooling you like — and generates a complete, working backend project tailored to those choices.
+              <IC>create-tcx-backend</IC> is an interactive CLI scaffolder for Node.js backends. Run <IC>npx create-tcx-backend</IC>, answer a few questions about your stack, and get a complete, working backend project tailored to those choices — no manual setup required.
             </p>
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              Think of it like <IC>create-react-app</IC> or <IC>create-next-app</IC>, but for your backend. You run one command and get a project that already compiles, connects to a database, handles errors, and serves a health endpoint — before you write a single line of your own code.
+              Think of it like a backend-focused <IC>create-react-app</IC>. One command, then you have a project that compiles, connects to a database, handles errors, and serves health checks — before you write any of your own code.
             </p>
 
-            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              It is <strong className="text-zinc-300">opinionated but not prescriptive.</strong> The generated structure is sensible and consistent across all framework/database combinations, but it is just a starting point — delete, rename, and reorganize whatever you want once you have it.
+            <Code code="npx create-tcx-backend" lang="bash" />
+
+            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
+              The CLI does not require a global install. <IC>npx</IC> downloads and runs the latest version on each invocation. Everything stays clean.
             </p>
 
             <H3>Why it exists</H3>
             <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              Every Node.js project starts with the same 30 minutes of busywork: install the framework, add CORS, hook up dotenv, write a logger, set up the database connection, add error handling, create the folder structure. That time adds up across projects and it is all the same work every time. <IC>create-tcx-backend</IC> does that work for you so you can spend the first 30 minutes actually building something.
+              Every Node.js project starts with the same 30 minutes of busywork: install the framework, add CORS, wire up dotenv, write a logger, connect the database, set up error handling, create the folder structure. That time adds up across projects and it is the same work every time. <IC>create-tcx-backend</IC> does it for you so you can start building right away.
             </p>
+
+            <Callout type="tip" title="Requirements">
+              Node.js <strong>≥ 22.0.0</strong>. Run <IC>node --version</IC> to check. Use <a href="https://github.com/nvm-sh/nvm" className="underline underline-offset-2">nvm</a> to switch versions if needed.
+            </Callout>
           </section>
 
           <Divider />
@@ -287,24 +295,39 @@ export default function DocsPage() {
             <H2 id="how-it-works">How it works</H2>
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              When you run <IC>npx create-tcx-backend</IC>, the CLI starts an interactive prompt session. It collects your preferences, builds a configuration object from your answers, then walks a series of generators — each responsible for one part of the project (the server file, the database layer, the auth middleware, etc.) — and writes them to disk.
+              The CLI uses a <strong className="text-zinc-300">plugin pipeline</strong>. Each option you pick (framework, database, ORM, auth, validation, tooling) registers one or more plugins. When you confirm your choices, the pipeline runs in two phases:
             </p>
 
+            <div className="space-y-2 mb-4">
+              <div className="p-3 rounded-md border border-zinc-800 bg-zinc-900/20 text-[13px]">
+                <span className="font-mono text-zinc-300">1. Dependency injection</span>
+                <p className="text-zinc-500 mt-1 leading-relaxed">Each plugin adds its dependencies to <IC>package.json</IC> — no orphan packages, no conflicts.</p>
+              </div>
+              <div className="p-3 rounded-md border border-zinc-800 bg-zinc-900/20 text-[13px]">
+                <span className="font-mono text-zinc-300">2. File generation</span>
+                <p className="text-zinc-500 mt-1 leading-relaxed">Each plugin writes its files into an in-memory context. When all plugins have run, the engine writes everything to disk, installs dependencies, and optionally initializes git.</p>
+              </div>
+            </div>
+
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              Generators are composable. The Express generator and the Prisma generator and the JWT generator all run independently and produce files that fit together. You are not pulling from a single monolithic template.
+              Plugins are composable and independent. The Express generator and the Prisma generator and the JWT generator all run separately and produce files that fit together. You are not pulling from a monolithic template.
             </p>
 
             <H3>The prompt flow</H3>
             <div className="my-4 space-y-0">
               {[
-                { q: "Project name", a: "Becomes the folder name and the package.json name field." },
-                { q: "Language",     a: "TypeScript gives you tsconfig.json, tsx for hot-reload, and typed declarations throughout. JavaScript uses nodemon." },
-                { q: "Framework",    a: "Express, Fastify, or Hono. Picks the HTTP layer — the rest of the structure stays the same." },
-                { q: "Database",     a: "PostgreSQL, MySQL, SQLite, or MongoDB. Determines which drivers are installed." },
-                { q: "ORM",         a: "Prisma, Drizzle, Mongoose, or none. Controls how the database layer is wired up." },
-                { q: "Auth",        a: "JWT (with bcrypt + jsonwebtoken) or Better Auth or none." },
-                { q: "Validation",  a: "Zod or none." },
-                { q: "Tooling",     a: "Multi-select: Docker, Swagger, ESLint, Prettier, Husky. Any combination." },
+                { q: "Project name", a: "Becomes the folder name and the package.json name field. Use \".\" to scaffold in the current directory." },
+                { q: "Package manager", a: "npm, pnpm, yarn, or bun. Used for dependency installation and script execution." },
+                { q: "Framework", a: "Express, Fastify, or Hono. Picks the HTTP layer — the rest of the structure stays the same." },
+                { q: "Language", a: "TypeScript (tsconfig, types) or JavaScript (simpler setup, nodemon for watch mode)." },
+                { q: "Module system", a: "ES Modules (import/export) or CommonJS (require/module.exports). TypeScript projects default to ESM." },
+                { q: "Database", a: "PostgreSQL, MySQL, SQLite, MongoDB, or None. Determines which drivers are installed." },
+                { q: "ORM", a: "Prisma, Drizzle, Mongoose, or raw driver. Options are filtered based on your database choice." },
+                { q: "Auth", a: "JWT (bcryptjs + jsonwebtoken), Better Auth, or None." },
+                { q: "Validation", a: "Zod or None." },
+                { q: "API type", a: "REST (ready), GraphQL (Apollo — scaffolding in development), tRPC (scaffolding in development)." },
+                { q: "Tooling (multi)", a: "Docker, Swagger, ESLint, Prettier, Husky. Any combination, all independent." },
+                { q: "Git & install", a: "Optionally initialize a git repo and install dependencies automatically." },
               ].map(({ q, a }, i) => (
                 <div key={q} className="flex gap-4 py-3 border-b border-zinc-800/40 last:border-0">
                   <span className="text-[11px] font-mono text-zinc-600 mt-0.5 shrink-0 w-5 text-right">{i + 1}</span>
@@ -317,8 +340,12 @@ export default function DocsPage() {
             </div>
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mt-4">
-              After the prompts, the CLI writes all the files, installs dependencies with your package manager, and prints a short summary of what was generated. The whole process takes under a minute.
+              After the prompts, the CLI writes all files, installs dependencies, and prints a summary. The whole process takes under a minute.
             </p>
+
+            <Callout type="info">
+              The CLI currently supports <strong className="text-zinc-300">interactive mode only</strong>. There are no <IC>--yes</IC> or <IC>--template</IC> flags yet — all choices go through the prompt system.
+            </Callout>
           </section>
 
           <Divider />
@@ -330,34 +357,34 @@ export default function DocsPage() {
             <H2 id="what-you-get">What you get</H2>
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              Every generated project — regardless of which options you chose — ships with this baseline:
+              Every generated project — regardless of which options you chose — ships with this baseline. These are the files you always get, no matter what.
             </p>
 
             <div className="space-y-3 mb-6">
               {[
                 {
                   name: "HTTP server",
-                  desc: "Fully running with CORS, JSON body parsing, and a global error handler. Visit the server and it responds immediately.",
+                  desc: "Fully configured with CORS, JSON body parsing, and a global error handler. Pick Express, Fastify, or Hono — all three produce the same structure.",
                 },
                 {
                   name: "/api/health endpoint",
-                  desc: "Returns the server status, uptime, and environment. Use it as a readiness check in Docker or a load balancer.",
+                  desc: "Returns status, timestamp, and uptime. Use it as a readiness check in Docker or a load balancer.",
                 },
                 {
                   name: "src/config/index.ts",
-                  desc: "Reads all environment variables from .env using dotenv and exports a typed config object. Every other file imports from here — no scattered process.env calls.",
+                  desc: "Reads environment variables from .env via dotenv and exports a typed config object. Every other file imports from here — no scattered process.env calls.",
                 },
                 {
                   name: "src/utils/logger.ts",
-                  desc: "A minimal logger with .info(), .warn(), and .error() methods. No heavy dependencies — swap it for Winston or Pino whenever you're ready.",
+                  desc: "Lightweight logger with .info(), .warn(), .error(). No heavy dependencies — swap it for Winston or Pino later.",
                 },
                 {
                   name: ".env + .env.example",
-                  desc: "The .env file has all required keys pre-filled with safe placeholder values. The .env.example is the same file but with values stripped out — safe to commit.",
+                  desc: "All required keys pre-filled with safe placeholders. The .env.example has the same keys with values stripped — safe to commit.",
                 },
                 {
-                  name: "package.json scripts",
-                  desc: "dev, build, and start scripts wired to the correct commands for your language (TypeScript or JavaScript) and framework.",
+                  name: "npm scripts",
+                  desc: "dev, build, and start scripts wired to the correct commands for your language and framework.",
                 },
               ].map(({ name, desc }) => (
                 <div key={name} className="flex gap-3 p-3 rounded-md border border-zinc-800/60 bg-zinc-900/20">
@@ -371,7 +398,7 @@ export default function DocsPage() {
             </div>
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              On top of this baseline, you get whatever you asked for — the database layer, auth middleware, Zod validators, Docker config, Swagger UI, and so on. All of it is covered in the Guide section below.
+              On top of this baseline, you get whatever you asked for — database layer, auth middleware, Zod validators, Docker config, Swagger UI, and so on. Each is covered in the sections below.
             </p>
           </section>
 
@@ -384,31 +411,27 @@ export default function DocsPage() {
             <H2 id="quickstart">Quick Start</H2>
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              Run the scaffolder. No global install needed — <IC>npx</IC> downloads and runs it directly.
+              Run the scaffolder:
             </p>
             <Code code="npx create-tcx-backend" lang="bash" />
 
-            <Callout type="tip" title="Node.js version">
-              Requires Node.js <strong>≥ 22.0.0</strong>. Run <IC>node --version</IC> to check. If you need to switch versions, use <a href="https://github.com/nvm-sh/nvm" className="underline underline-offset-2">nvm</a>.
-            </Callout>
-
             <H3>After the prompts finish</H3>
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              The CLI installs dependencies automatically. Once it is done:
+              The CLI installs dependencies automatically. Once done:
             </p>
             <Code code={`cd your-project-name\nnpm run dev`} lang="bash" />
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              Open <IC>http://localhost:3000/api/health</IC>. You should see something like:
+              Open <IC>http://localhost:5000/api/health</IC>. You should see:
             </p>
             <Code lang="json" code={`{
-  "status": "ok",
-  "uptime": 1.24,
-  "environment": "development"
+  "status": "OK",
+  "timestamp": "2026-06-16T00:00:00.000Z",
+  "uptime": 1.24
 }`} />
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              That means the server is running. Now open <IC>.env</IC> and fill in your real database credentials, then run your first migration if you chose Prisma or Drizzle.
+              The server is running. Now edit <IC>.env</IC> with your real database credentials, run your first migration if applicable, and start building.
             </p>
 
             <H3>First-time setup with Prisma or Drizzle</H3>
@@ -418,9 +441,14 @@ npm run db:generate
 # Run the migration against your database
 npm run db:migrate`} />
 
-            <Callout type="warn" title="Don't skip this">
-              If you picked Prisma or Drizzle and try to run the server without generating first, it will crash on startup because the client code does not exist yet.
+            <Callout type="warn" title="Generate before starting">
+              If you picked Prisma or Drizzle and try to run the server before generating, it will crash immediately — the client code does not exist yet.
             </Callout>
+
+            <H3>Scaffold in the current directory</H3>
+            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
+              Enter <IC>.</IC> as the project name to scaffold directly into the current directory. The CLI warns if the directory is non-empty.
+            </p>
           </section>
 
           <Divider />
@@ -432,20 +460,20 @@ npm run db:migrate`} />
             <H2 id="frameworks">Frameworks</H2>
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              You pick one framework at scaffold time. All three produce the same folder structure — only the framework-specific wiring inside <IC>src/app.ts</IC> is different.
+              Pick one framework at scaffold time. All three produce the same folder structure — only the framework-specific wiring inside <IC>src/app.ts</IC> differs.
             </p>
 
             <Table
-              heads={["Framework", "Version", "Notes"]}
+              heads={["Framework", "Version", "Wiring"]}
               rows={[
-                ["Express", "^4.19", "cors + express.json() + 4-argument error handler"],
+                ["Express", "^4.19", "cors + express.json() + 4-arg error handler"],
                 ["Fastify", "^4.28", "@fastify/cors + setErrorHandler()"],
-                ["Hono",    "^4.4",  "@hono/node-server adapter + hono/cors"],
+                ["Hono",    "^4.4",  "hono/cors + @hono/node-server adapter"],
               ]}
             />
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              The server entry point always follows this pattern — connect the database, then start listening:
+              The server entry point always follows the same pattern — connect the database, then start listening:
             </p>
             <Code lang="typescript" code={`// src/server.ts
 import app from "./app";
@@ -471,7 +499,7 @@ main().catch((err) => {
 
             <H3>Which framework should I pick?</H3>
             <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              <strong className="text-zinc-300">Express</strong> if you want the largest ecosystem and the most Stack Overflow answers. <strong className="text-zinc-300">Fastify</strong> if you care about raw performance and like its plugin architecture. <strong className="text-zinc-300">Hono</strong> if you want something modern, lightweight, and possibly portable to edge runtimes later. All three are excellent choices for a REST API.
+              <strong className="text-zinc-300">Express</strong> if you want the largest ecosystem and the most community support. <strong className="text-zinc-300">Fastify</strong> if you care about raw performance and like its plugin architecture. <strong className="text-zinc-300">Hono</strong> if you want something modern, lightweight, and portable to edge runtimes later. All three are excellent for REST APIs.
             </p>
           </section>
 
@@ -525,7 +553,7 @@ export const users = pgTable("users", {
 
             <H3>Mongoose</H3>
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              The classic MongoDB ODM. Generates a simple <IC>connectDatabase()</IC> that calls <IC>mongoose.connect()</IC> using the <IC>MONGODB_URI</IC> from your <IC>.env</IC>. Only works with <strong className="text-zinc-300">MongoDB</strong>.
+              The classic MongoDB ODM. Generates <IC>connectDatabase()</IC> that calls <IC>mongoose.connect()</IC> using the <IC>MONGODB_URI</IC> from your <IC>.env</IC>. Only works with <strong className="text-zinc-300">MongoDB</strong>.
             </p>
             <Code lang="typescript" code={`// src/database/index.ts
 import mongoose from "mongoose";
@@ -537,11 +565,11 @@ export async function connectDatabase() {
 
             <H3>No ORM</H3>
             <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              Generates raw driver connection code with no abstraction — <IC>pg.Pool</IC> for PostgreSQL, <IC>mysql2</IC> for MySQL, <IC>better-sqlite3</IC> for SQLite, or the native MongoDB driver. Pick this when you want to write raw SQL or manage your own query layer.
+              Generates raw driver connection code — <IC>pg.Pool</IC> for PostgreSQL, <IC>mysql2</IC> for MySQL, <IC>better-sqlite3</IC> for SQLite, or the native MongoDB driver. Pick this when you want to write raw SQL or manage your own query layer.
             </p>
 
             <Callout type="warn" title="Run db:generate first">
-              With Prisma or Drizzle, always run <IC>npm run db:generate</IC> before starting the server for the first time. The client code is generated — it does not exist until you run this.
+              With Prisma or Drizzle, always run <IC>npm run db:generate</IC> before starting the server. The client code is generated — it does not exist until you run this.
             </Callout>
           </section>
 
@@ -554,25 +582,25 @@ export async function connectDatabase() {
             <H2 id="auth">Authentication</H2>
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              Auth is optional. Skip it if you're building an internal service, a public API with no user accounts, or if you're handling auth at a different layer. If you do want it, you get one of two strategies:
+              Auth is optional. Skip it for internal services, public APIs with no user accounts, or if you handle auth at a different layer. If you do want it, you get one of two strategies:
             </p>
 
             <H3>JWT <Badge accent>recommended</Badge></H3>
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              Scaffolds two files and registers the auth routes at <IC>/api/auth</IC>:
+              Scaffolds two files and registers auth routes at <IC>/api/auth</IC>:
             </p>
             <div className="space-y-2 mb-4">
               <div className="p-3 rounded-md border border-zinc-800 bg-zinc-900/20 text-[13px]">
                 <IC>auth.controller.ts</IC>
                 <p className="text-zinc-500 mt-1.5 leading-relaxed">
-                  <IC>POST /api/auth/register</IC> — hashes the password with <IC>bcryptjs</IC>, saves the user, returns a JWT.<br />
-                  <IC>POST /api/auth/login</IC> — verifies credentials, returns a signed JWT on success.
+                  <IC>POST /api/auth/register</IC> — hashes password with <IC>bcryptjs</IC>, saves the user, returns a JWT.<br />
+                  <IC>POST /api/auth/login</IC> — verifies credentials, returns a signed JWT.
                 </p>
               </div>
               <div className="p-3 rounded-md border border-zinc-800 bg-zinc-900/20 text-[13px]">
                 <IC>auth.middleware.ts</IC>
                 <p className="text-zinc-500 mt-1.5 leading-relaxed">
-                  Exports a <IC>protect</IC> middleware. Reads the <IC>Authorization: Bearer &lt;token&gt;</IC> header, verifies it with <IC>jsonwebtoken</IC>, and attaches the decoded payload to <IC>req.user</IC>. Throws a <IC>401</IC> if the token is missing or invalid.
+                  Exports a <IC>protect</IC> middleware. Reads <IC>Authorization: Bearer &lt;token&gt;</IC>, verifies with <IC>jsonwebtoken</IC>, attaches decoded payload to <IC>req.user</IC>. Returns <IC>401</IC> on missing or invalid token.
                 </p>
               </div>
             </div>
@@ -580,18 +608,17 @@ export async function connectDatabase() {
 import { protect } from "../middlewares/auth.middleware";
 
 router.get("/me", protect, async (req, res) => {
-  // req.user is the decoded JWT payload, e.g. { id, email, iat, exp }
   const user = await userService.findById(req.user.id);
   res.json({ user });
 });`} />
             <Callout type="warn" title="Set JWT_SECRET before deploying">
-              The generated <IC>.env</IC> has a placeholder value. Replace it with a long random string (<IC>openssl rand -base64 32</IC>) and never commit it to version control.
+              The generated <IC>.env</IC> has a placeholder value. Replace it with a long random string (<IC>openssl rand -base64 32</IC>). Never commit the real secret.
             </Callout>
 
             <H3>Better Auth</H3>
             <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              Scaffolds the <IC>better-auth</IC> configuration in <IC>src/config/auth.ts</IC> and mounts the auth handler at <IC>/api/auth/*</IC>. Better Auth handles sessions, OAuth providers, email/password, email verification, and more out of the box. See the{" "}
-              <a href="https://better-auth.com" target="_blank" rel="noopener noreferrer" className="text-zinc-300 underline underline-offset-2">Better Auth documentation</a>{" "}
+              Scaffolds <IC>better-auth</IC> config in <IC>src/config/auth.ts</IC> and mounts the handler at <IC>/api/auth/*</IC>. Better Auth handles sessions, OAuth providers, email/password, email verification, and more out of the box. See the{" "}
+              <a href="https://better-auth.com" target="_blank" rel="noopener noreferrer" className="text-zinc-300 underline underline-offset-2">Better Auth docs</a>{" "}
               for provider configuration.
             </p>
           </section>
@@ -605,7 +632,7 @@ router.get("/me", protect, async (req, res) => {
             <H2 id="validation">Validation</H2>
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              If you select Zod, the CLI generates a <IC>src/app/validators/</IC> directory with starter schemas. The pattern is simple: define schemas in validator files, call <IC>safeParse()</IC> at the top of your controller, and bail early if validation fails.
+              If you select Zod, the CLI generates a <IC>src/app/validators/</IC> directory with starter schemas. Define schemas in validator files, call <IC>safeParse()</IC> in your controller, and bail early if validation fails.
             </p>
 
             <Code lang="typescript" code={`// src/app/validators/auth.validator.ts
@@ -627,20 +654,49 @@ export const register = async (req, res, next) => {
   const result = registerSchema.safeParse(req.body);
 
   if (!result.success) {
-    // Returns structured field-level errors, not a raw Zod error
     return res.status(400).json({
       error: "Validation failed",
       fields: result.error.flatten().fieldErrors,
     });
   }
 
-  // result.data is fully typed at this point
+  // result.data is fully typed
   const { email, password } = result.data;
   // ...
 };`} />
 
             <Callout type="tip">
-              Use <IC>safeParse</IC> instead of <IC>parse</IC> in request handlers. It never throws — it returns a result object you can inspect, which keeps your error handling explicit and predictable.
+              Use <IC>safeParse</IC> instead of <IC>parse</IC> in request handlers. It never throws — it returns a result object you can inspect, keeping error handling explicit and predictable.
+            </Callout>
+          </section>
+
+          <Divider />
+
+          {/* ═══════════════════════════════════════════════════════════
+              SECTION: API TYPE
+          ════════════════════════════════════════════════════════════ */}
+          <section id="api-type">
+            <H2 id="api-type">API Type</H2>
+
+            <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
+              The CLI asks which API layer you want. This determines how your routes and controllers are structured.
+            </p>
+
+            <Table
+              heads={["Type", "Status", "Description"]}
+              rows={[
+                ["REST", "Ready", "Traditional REST endpoints with controllers, services, and routes"],
+                ["GraphQL", "In development", "Apollo Server integration with schema-first approach"],
+                ["tRPC", "In development", "End-to-end type-safe API with tRPC server adapter"],
+              ]}
+            />
+
+            <p className="text-[13.5px] text-zinc-400 leading-relaxed">
+              <strong className="text-zinc-300">REST</strong> is fully scaffolded with controllers, services, routes, and middleware — the entire pipeline described in these docs. GraphQL and tRPC scaffolding is in active development. Selecting them currently generates the REST structure as a starting point.
+            </p>
+
+            <Callout type="info">
+              Regardless of API type, the <IC>/api/health</IC> endpoint, database connection, error handling, and tooling are always generated the same way.
             </Callout>
           </section>
 
@@ -653,31 +709,31 @@ export const register = async (req, res, next) => {
             <H2 id="tooling">Tooling</H2>
 
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              Tooling options are selected separately from the core project options and are completely independent of each other. Pick whichever ones match how you work.
+              Tooling options are independent of each other and of the core project. Pick whichever ones match how you work.
             </p>
 
             <H3>Docker</H3>
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-3">
-              Generates a multi-stage <IC>Dockerfile</IC> and a <IC>.dockerignore</IC>. The <IC>builder</IC> stage compiles TypeScript; the lean <IC>runner</IC> stage copies only the compiled output and production dependencies.
+              Generates a multi-stage <IC>Dockerfile</IC> and <IC>.dockerignore</IC>. The <IC>builder</IC> stage compiles TypeScript; the <IC>runner</IC> stage copies only compiled output and production dependencies.
             </p>
             <Code lang="dockerfile" code={`FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json .
 RUN npm ci
 COPY . .
-RUN npm run build          # tsc -> dist/
+RUN npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
-EXPOSE 3000
+EXPOSE 5000
 CMD ["node", "dist/server.js"]`} />
 
             <H3>Swagger / OpenAPI</H3>
             <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              Generates <IC>src/config/swagger.ts</IC> with a starter OpenAPI 3.0 document and mounts Swagger UI at <IC>/api-docs</IC>. Currently <strong className="text-zinc-300">Express only</strong>. Open <IC>http://localhost:3000/api-docs</IC> to explore your API interactively.
+              Generates <IC>src/config/swagger.ts</IC> with a starter OpenAPI 3.0 document and mounts Swagger UI at <IC>/api-docs</IC>. Currently <strong className="text-zinc-300">Express only</strong>. Open <IC>http://localhost:5000/api-docs</IC> to explore your API interactively.
             </p>
 
             <H3>ESLint</H3>
@@ -698,7 +754,7 @@ CMD ["node", "dist/server.js"]`} />
 
             <H3>Husky + lint-staged</H3>
             <p className="text-[13.5px] text-zinc-400 leading-relaxed">
-              Adds a Git pre-commit hook via Husky and a <IC>.lintstagedrc</IC> that runs ESLint and Prettier against staged files in <IC>src/</IC> before each commit. This ensures no unformatted or rule-violating code gets into your history.
+              Adds a Git pre-commit hook via Husky and a <IC>.lintstagedrc</IC> that runs ESLint and Prettier against staged files before each commit. Ensures no unformatted or rule-violating code enters your history.
             </p>
           </section>
 
@@ -715,14 +771,13 @@ CMD ["node", "dist/server.js"]`} />
             <Table
               heads={["Script", "What it runs", "When present"]}
               rows={[
-                ["npm run dev",         "tsx watch src/server.ts  (TS)  /  nodemon src/server.js  (JS)", "Always"],
+                ["npm run dev",         "tsx watch src/server.ts (TS) / nodemon src/server.js (JS)", "Always"],
                 ["npm run build",       "tsc — compiles TypeScript to dist/", "TypeScript only"],
-                ["npm start",           "node dist/server.js  (TS)  /  node src/server.js  (JS)", "Always"],
-                ["npm run db:generate", "prisma generate  /  drizzle-kit generate", "Prisma or Drizzle"],
-                ["npm run db:migrate",  "prisma migrate dev  /  drizzle-kit migrate", "Prisma or Drizzle"],
+                ["npm start",           "node dist/server.js (TS) / node src/server.js (JS)", "Always"],
+                ["npm run db:generate", "prisma generate / drizzle-kit generate", "Prisma or Drizzle"],
+                ["npm run db:migrate",  "prisma migrate dev / drizzle-kit migrate", "Prisma or Drizzle"],
                 ["npm run lint",        "eslint src/", "ESLint selected"],
                 ["npm run format",      "prettier --write src/", "Prettier selected"],
-                ["npm run prepare",     "husky — installs Git hooks", "Husky selected"],
               ]}
             />
           </section>
@@ -735,7 +790,7 @@ CMD ["node", "dist/server.js"]`} />
           <section id="structure">
             <H2 id="structure">Project Structure</H2>
             <p className="text-[13.5px] text-zinc-400 leading-relaxed mb-4">
-              The generated project always uses this structure, regardless of which options you chose. Optional directories only appear if you selected the corresponding feature.
+              The generated project always uses this structure. Optional directories only appear if you selected the corresponding feature.
             </p>
 
             <Code lang="text" code={`your-project/
@@ -743,26 +798,26 @@ CMD ["node", "dist/server.js"]`} />
 │   └── schema.prisma          # Prisma schema + User model  [Prisma only]
 ├── src/
 │   ├── app/
-│   │   ├── controllers/       # Thin handlers — validate input, call a service, return response
+│   │   ├── controllers/       # Validate input, call a service, return response
 │   │   ├── middlewares/
 │   │   │   ├── auth.middleware.ts   # protect()  [JWT only]
-│   │   │   └── error.middleware.ts  # Catches all thrown errors, returns consistent JSON
+│   │   │   └── error.middleware.ts  # Catches errors, returns consistent JSON
 │   │   ├── models/            # Mongoose schemas  [Mongoose only]
-│   │   ├── routes/            # Route declarations — wire controllers to paths here
-│   │   ├── services/          # Business logic — all database calls live here
+│   │   ├── routes/            # Wire controllers to paths
+│   │   ├── services/          # Business logic — all DB calls live here
 │   │   └── validators/        # Zod schemas  [Zod only]
 │   ├── config/
-│   │   ├── index.ts           # Reads .env, exports typed config object
+│   │   ├── index.ts           # Reads .env, exports typed config
 │   │   ├── auth.ts            # Better Auth config  [Better Auth only]
 │   │   └── swagger.ts         # OpenAPI 3.0 document  [Swagger only]
 │   ├── database/
-│   │   ├── index.ts           # connectDatabase() + exported client
+│   │   ├── index.ts           # connectDatabase() + client export
 │   │   └── schema.ts          # Drizzle table definitions  [Drizzle only]
 │   ├── utils/
 │   │   └── logger.ts          # logger.info() / .warn() / .error()
-│   ├── app.ts                 # Framework instance, middleware chain, route registration
-│   └── server.ts              # Awaits DB connection, then starts the listener
-├── .env                       # Your secrets — never commit
+│   ├── app.ts                 # Framework instance, middleware, route registration
+│   └── server.ts              # Awaits DB, starts listener
+├── .env                       # Secrets — never commit
 ├── .env.example               # Same keys, no values — safe to commit
 ├── drizzle.config.ts          # Drizzle config  [Drizzle only]
 ├── Dockerfile                 # Multi-stage build  [Docker only]
@@ -780,9 +835,9 @@ CMD ["node", "dist/server.js"]`} />
             <div className="space-y-2 mt-3">
               {[
                 ["routes/", "Map HTTP paths to controller functions. No logic here."],
-                ["controllers/", "Validate the request (Zod), call a service, return the response. Nothing else."],
+                ["controllers/", "Validate the request (Zod), call a service, return the response."],
                 ["services/", "Own all business logic and database calls. Testable in isolation — no req/res objects."],
-                ["database/", "Export the client and the connection function. Services import from here."],
+                ["database/", "Export the client and connection function. Services import from here."],
                 ["config/", "One place for all environment config. Every other file imports from here."],
               ].map(([layer, desc]) => (
                 <div key={layer as string} className="flex gap-3 text-[13px]">
