@@ -6,6 +6,10 @@ export const metadata: Metadata = {
     "Full documentation for create-tcx-backend: frameworks, databases, ORMs, authentication, validation, tooling, and project structure.",
 };
 
-export default function DocsLayout({ children }: { children: React.ReactNode }) {
+export default function DocsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return children;
 }

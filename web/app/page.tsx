@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { IconBrandGithub, IconCheck, IconCopy, IconDownload } from "@tabler/icons-react";
+import {
+  IconBrandGithub,
+  IconCheck,
+  IconCopy,
+  IconDownload,
+} from "@tabler/icons-react";
 import { motion, AnimatePresence } from "motion/react";
 
 const title = "Create Your Backend App with Package not manually";
@@ -22,7 +27,6 @@ export default function Home() {
   return (
     <div className="h-screen w-full flex items-center justify-center">
       <div className="max-w-md w-full flex flex-col gap-10">
-
         {/* Header row */}
         <div className="flex items-center justify-between">
           <motion.div
@@ -90,9 +94,7 @@ export default function Home() {
             className="max-w-md text-sm leading-8 tracking-normal text-zinc-600/50 dark:text-zinc-400/50 font-mono border border-dashed border-neutral-500/60 dark:border-neutral-400/70 w-full px-4 py-0.5 cursor-pointer flex select-none"
           >
             create-tcx-
-            <span className="text-neutral-700 dark:text-white/80">
-              backend
-            </span>
+            <span className="text-neutral-700 dark:text-white/80">backend</span>
             <span className="absolute right-5 top-5.5">
               <AnimatePresence mode="wait">
                 {copied ? (
@@ -135,7 +137,6 @@ export default function Home() {
           <Link href="/docs">[Docs]</Link>
           <div className="flex gap-3">[github] [npm]</div>
         </motion.div>
-
       </div>
     </div>
   );
