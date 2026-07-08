@@ -5,16 +5,21 @@ import { askQuestions } from './prompts.js';
 import { registry } from './registry/index.js';
 import './registry/plugins-impl.js'; // Register frameworks and plugins
 import { generateProject } from './engine/index.js';
+import { checkForUpdates } from './utils/version-check.js';
+import { VERSION } from './version.js';
 import picocolors from 'picocolors';
 
 async function main() {
   program
     .name('create-tcx-backend')
     .description('Scaffold production-ready Node.js backends in seconds')
-    .version('1.0.0');
+    .version(VERSION);
 
   program.action(async () => {
     try {
+      // Check for updates asynchronously (non-blocking)
+      checkForUpdates().catch(() => {});
+
       const ctx = await askQuestions();
       if (!ctx) return;
 
