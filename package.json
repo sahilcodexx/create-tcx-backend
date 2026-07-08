@@ -9,7 +9,10 @@
   ],
   "scripts": {
     "cli:dev": "node cli/bin/index.js",
-    "web:dev": "npm run dev --workspace=web"
+    "web:dev": "npm run dev --workspace=web",
+    "test": "npm run test:cli && npm run test:web",
+    "test:cli": "npm run test --workspace=cli",
+    "test:web": "pnpm --filter web run test"
   },
   "keywords": [],
   "author": "",
